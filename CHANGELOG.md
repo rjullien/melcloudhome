@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1-rjullien.4] - 2026-10-22
+
+### Added
+
+- Diagnostic DEBUG logger `custom_components.melcloudhome.api.raw_unit_debug` dumps each ATA unit's redacted raw `/context` settings (and other top-level unit keys) and WebSocket `unitStateChanged` frames, once per unit and again when values change, with `captured_at` / `frame_timestamp` for correlating Automatic heat/cool and standby transitions. Emails, tokens, serials and MACs are redacted. No behaviour change when the logger is not at DEBUG. (fork)
+
 ## [2.6.1-rjullien.3] - 2026-10-22
 
 ### Added

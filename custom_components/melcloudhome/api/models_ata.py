@@ -23,6 +23,7 @@ from .parsing import (
     strip_line_breaks,
     summarize_cloud_schedule,
 )
+from .raw_unit_debug import log_ata_context_unit
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -226,6 +227,9 @@ class AirToAirUnit:
         The API returns device state as a list of name-value pairs in the 'settings' array.
         Example: [{"name": "Power", "value": "False"}, {"name": "SetTemperature", "value": "20"}, ...]
         """
+        # Diagnostic only (DEBUG logger raw_unit_debug); no behaviour change.
+        log_ata_context_unit(data)
+
         capabilities_data = data.get("capabilities", {})
         capabilities = AirToAirCapabilities.from_dict(capabilities_data)
 
