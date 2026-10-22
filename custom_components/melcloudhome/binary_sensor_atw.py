@@ -45,12 +45,18 @@ ATW_BINARY_SENSOR_TYPES: tuple[ATWBinarySensorEntityDescription, ...] = (
         value_fn=lambda unit: unit.is_in_error,
         attributes_fn=lambda unit: {"error_code": unit.error_code},
     ),
-    # Connection state - indicates if device is connected and responding
+    # Connection state - unit linked to MELCloud (isConnected from /context).
+    # Missing isConnected is treated as connected so older payloads do not
+    # flip every install to "off"; the raw value stays on the attributes.
     ATWBinarySensorEntityDescription(
         key="connection_state",
         translation_key="connection_state",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
-        value_fn=lambda unit: True,  # Connection is determined by coordinator
+        value_fn=lambda unit: True if unit.is_connected is None else unit.is_connected,
+        attributes_fn=lambda unit: {
+            "is_connected": unit.is_connected,
+            "connected_interface_type": unit.connected_interface_type,
+        },
     ),
     # Forced DHW active - indicates when DHW has priority over zones
     ATWBinarySensorEntityDescription(

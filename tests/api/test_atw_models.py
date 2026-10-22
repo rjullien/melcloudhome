@@ -152,6 +152,7 @@ class TestAirToWaterUnit:
         # Status
         assert unit.power is True
         assert unit.in_standby_mode is False
+        assert unit.is_connected is True
 
     def test_unit_from_dict_parses_settings_array(self) -> None:
         """Test that settings array is correctly parsed into typed fields."""
@@ -162,6 +163,46 @@ class TestAirToWaterUnit:
         assert unit.operation_status == "HotWater"
         assert unit.operation_mode_zone1 == "HeatCurve"
         assert unit.forced_hot_water_mode is True
+
+    @pytest.mark.parametrize(
+        ("payload_extra", "expected_connected", "expected_interface"),
+        [
+            pytest.param(
+                {"isConnected": True, "connectedInterfaceType": 0},
+                True,
+                0,
+                id="connected_with_interface",
+            ),
+            pytest.param(
+                {"isConnected": False, "connectedInterfaceType": 2},
+                False,
+                2,
+                id="disconnected",
+            ),
+            pytest.param({}, None, None, id="missing_fields"),
+            pytest.param(
+                {"isConnected": "False", "connectedInterfaceType": "2"},
+                False,
+                2,
+                id="string_values",
+            ),
+        ],
+    )
+    def test_unit_from_dict_parses_is_connected(
+        self,
+        payload_extra: dict[str, Any],
+        expected_connected: bool | None,
+        expected_interface: int | None,
+    ) -> None:
+        """isConnected / connectedInterfaceType are top-level /context fields."""
+        data = deepcopy(ATW_UNIT_HEATING_DHW)
+        data.pop("isConnected", None)
+        data.update(payload_extra)
+
+        unit = AirToWaterUnit.from_dict(data)
+
+        assert unit.is_connected is expected_connected
+        assert unit.connected_interface_type is expected_interface
 
     def test_unit_from_dict_converts_string_booleans(self) -> None:
         """Test that string "True"/"False" are converted to bool."""

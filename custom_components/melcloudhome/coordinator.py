@@ -343,9 +343,55 @@ class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
             live_unit_ids.update(unit.id for unit in building.air_to_water_units)
         self._outdoor_temp_failing &= live_unit_ids
 
+        # Log per-unit MELCloud link changes before caches are replaced
+        self._log_unit_connectivity_transitions(context)
+
         # Update caches for O(1) lookups
         self._rebuild_caches(context)
         return context
+
+    @staticmethod
+    def _effective_unit_connected(is_connected: bool | None) -> bool:
+        """Treat a missing isConnected as connected (same as the binary sensor)."""
+        return True if is_connected is None else is_connected
+
+    def _log_connectivity_transition(
+        self,
+        previous: AirToAirUnit | AirToWaterUnit | None,
+        unit: AirToAirUnit | AirToWaterUnit,
+    ) -> None:
+        """Warn once when a unit's MELCloud link flips connected↔disconnected."""
+        if previous is None:
+            return
+        was = self._effective_unit_connected(previous.is_connected)
+        now = self._effective_unit_connected(unit.is_connected)
+        if was and not now:
+            _LOGGER.warning(
+                "%s lost connection to MELCloud (isConnected=false)",
+                unit.name,
+            )
+        elif not was and now:
+            _LOGGER.warning(
+                "%s reconnected to MELCloud (isConnected=true)",
+                unit.name,
+            )
+
+    def _log_unit_connectivity_transitions(self, context: UserContext) -> None:
+        """Warn once per connected↔disconnected transition for each unit.
+
+        Compares the new /context units against the previous cache. First
+        sighting of a unit is not a transition. Missing isConnected is treated
+        as connected so a field that appears later as false still logs once.
+        """
+        for building in context.buildings:
+            for ata_unit in building.air_to_air_units:
+                self._log_connectivity_transition(
+                    self._units.get(ata_unit.id), ata_unit
+                )
+            for atw_unit in building.air_to_water_units:
+                self._log_connectivity_transition(
+                    self._atw_units.get(atw_unit.id), atw_unit
+                )
 
     def _rebuild_caches(self, context: UserContext) -> None:
         """Rebuild lookup caches from context data."""

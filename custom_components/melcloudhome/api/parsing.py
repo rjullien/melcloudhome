@@ -32,6 +32,24 @@ def parse_bool(value: str | bool | None) -> bool:
     return str(value).lower() == "true"
 
 
+def parse_optional_bool(value: str | bool | None) -> bool | None:
+    """Parse an optional boolean, keeping absence distinct from False.
+
+    Used for top-level /context fields such as ``isConnected``, where a
+    missing key must not be treated as disconnected (regression risk for
+    older payloads). Present values follow the same rules as ``parse_bool``.
+
+    Args:
+        value: String "True"/"False", bool, or None when the field is absent
+
+    Returns:
+        Parsed boolean, or None if the value was absent
+    """
+    if value is None:
+        return None
+    return parse_bool(value)
+
+
 def parse_float(value: str | float | None) -> float | None:
     """Parse float from API string value.
 
