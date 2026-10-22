@@ -168,23 +168,35 @@ class TestAirToWaterUnit:
         ("payload_extra", "expected_connected", "expected_interface"),
         [
             pytest.param(
-                {"isConnected": True, "connectedInterfaceType": 0},
+                {
+                    "isConnected": True,
+                    "connectedInterfaceType": "melCloudWiFi",
+                },
                 True,
-                0,
-                id="connected_with_interface",
+                "melCloudWiFi",
+                id="cassette_label",
             ),
             pytest.param(
-                {"isConnected": False, "connectedInterfaceType": 2},
+                {
+                    "isConnected": False,
+                    "connectedInterfaceType": "fourthGenWifi",
+                },
                 False,
-                2,
-                id="disconnected",
+                "fourthGenWifi",
+                id="cassette_label_disconnected",
+            ),
+            pytest.param(
+                {"isConnected": True, "connectedInterfaceType": 0},
+                True,
+                "melCloudWiFi",
+                id="legacy_int",
             ),
             pytest.param({}, None, None, id="missing_fields"),
             pytest.param(
                 {"isConnected": "False", "connectedInterfaceType": "2"},
                 False,
-                2,
-                id="string_values",
+                "fourthGenWifi",
+                id="legacy_string_int",
             ),
         ],
     )
@@ -192,7 +204,7 @@ class TestAirToWaterUnit:
         self,
         payload_extra: dict[str, Any],
         expected_connected: bool | None,
-        expected_interface: int | None,
+        expected_interface: str | None,
     ) -> None:
         """isConnected / connectedInterfaceType are top-level /context fields."""
         data = deepcopy(ATW_UNIT_HEATING_DHW)
@@ -202,7 +214,7 @@ class TestAirToWaterUnit:
         unit = AirToWaterUnit.from_dict(data)
 
         assert unit.is_connected is expected_connected
-        assert unit.connected_interface_type is expected_interface
+        assert unit.connected_interface_type == expected_interface
 
     def test_unit_from_dict_converts_string_booleans(self) -> None:
         """Test that string "True"/"False" are converted to bool."""

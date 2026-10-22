@@ -76,7 +76,7 @@ surprises people.
 
 - **Error State**: `binary_sensor.melcloudhome_{short_id}_error_state`
   - Attribute `error_code`: device error code as reported by the API, `null` when no error. The API returns all settings values as strings, so a string is expected, but only the no-error case (empty string) has been observed so far — the exact format of active error codes is unconfirmed
-- **Connection**: `binary_sensor.melcloudhome_{short_id}_connection_state` — on when the unit is linked to MELCloud (`isConnected` from `/context`); missing `isConnected` is treated as on. Attributes: `is_connected` (raw bool or `null`), `connected_interface_type` (int or `null`). Other entities stay available when this is off.
+- **Connection**: `binary_sensor.melcloudhome_{short_id}_connection_state` — on when the unit is linked to MELCloud (`isConnected` from `/context`); missing `isConnected` is treated as on. Attributes: `is_connected` (raw bool or `null`), `connected_interface_type` (string label such as `fourthGenWifi` / `melCloudWiFi`, or `null`). Other entities stay available when this is off.
 - **Frost Protection**: `binary_sensor.melcloudhome_{short_id}_frost_protection` (created when the API reports the `frostProtection` object — every ATA unit does, as a server-side default, whether or not the mode has ever been configured)
   - Attribute `active`: currently engaging (e.g. room has crossed the threshold) — see the min/max sensors above for the configured band
 - **Overheat Protection**: `binary_sensor.melcloudhome_{short_id}_overheat_protection` (only created once ever configured)
@@ -280,7 +280,7 @@ to be created for every heat pump, where they read a constant 25 °C on devices 
 
 - **Error State**: `binary_sensor.melcloudhome_{short_id}_error_state`
   - Attribute `error_code`: device error code as reported by the API, `null` when no error. The API returns all settings values as strings, so a string is expected, but only the no-error case (empty string) has been observed so far — the exact format of active error codes is unconfirmed
-- **Connection**: `binary_sensor.melcloudhome_{short_id}_connection_state` — on when the unit is linked to MELCloud (`isConnected` from `/context`); missing `isConnected` is treated as on. Attributes: `is_connected` (raw bool or `null`), `connected_interface_type` (int or `null`). Other entities stay available when this is off.
+- **Connection**: `binary_sensor.melcloudhome_{short_id}_connection_state` — on when the unit is linked to MELCloud (`isConnected` from `/context`); missing `isConnected` is treated as on. Attributes: `is_connected` (raw bool or `null`), `connected_interface_type` (string label such as `fourthGenWifi` / `melCloudWiFi`, or `null`). Other entities stay available when this is off.
 - **Forced DHW Active**: `binary_sensor.melcloudhome_{short_id}_forced_dhw_active`
 
 ### ATW Control Options

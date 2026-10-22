@@ -9,8 +9,8 @@ from .const_atw import ATW_MODE_HEAT_ROOM_TEMP, ATW_STATUS_STOP
 from .parsing import (
     Reading,
     parse_bool as _parse_bool,
+    parse_connected_interface_type as _parse_connected_interface_type,
     parse_float as _parse_float,
-    parse_int as _parse_int,
     parse_optional_bool as _parse_optional_bool,
     strip_line_breaks,
 )
@@ -229,7 +229,8 @@ class AirToWaterUnit:
     # Per-unit cloud link from /context (top-level, not settings). None when the
     # field is absent so older/partial payloads do not look disconnected.
     is_connected: bool | None = None
-    connected_interface_type: int | None = None
+    # String label from /context (e.g. "fourthGenWifi"); legacy ints mapped.
+    connected_interface_type: str | None = None
 
     # Telemetry data (flow/return temperatures from telemetry API)
     # Populated by TelemetryTracker, read by sensors
@@ -330,5 +331,7 @@ class AirToWaterUnit:
             holiday_mode_enabled=holiday_enabled,
             frost_protection_enabled=frost_enabled,
             is_connected=_parse_optional_bool(data.get("isConnected")),
-            connected_interface_type=_parse_int(data.get("connectedInterfaceType")),
+            connected_interface_type=_parse_connected_interface_type(
+                data.get("connectedInterfaceType")
+            ),
         )

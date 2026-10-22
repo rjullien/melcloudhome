@@ -360,9 +360,31 @@ class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
         previous: AirToAirUnit | AirToWaterUnit | None,
         unit: AirToAirUnit | AirToWaterUnit,
     ) -> None:
-        """Warn once when a unit's MELCloud link flips connected↔disconnected."""
+        """Log unit MELCloud link details once on first sighting or change.
+
+        INFO when the ``(is_connected, connected_interface_type)`` pair first
+        appears or changes (so HA logs show real values without per-poll spam).
+        WARNING on connected↔disconnected flips after the unit was already seen.
+        """
+        pair = (unit.is_connected, unit.connected_interface_type)
         if previous is None:
+            _LOGGER.info(
+                "%s MELCloud link: isConnected=%s connectedInterfaceType=%s",
+                unit.name,
+                unit.is_connected,
+                unit.connected_interface_type,
+            )
             return
+
+        prev_pair = (previous.is_connected, previous.connected_interface_type)
+        if pair != prev_pair:
+            _LOGGER.info(
+                "%s MELCloud link changed: isConnected=%s connectedInterfaceType=%s",
+                unit.name,
+                unit.is_connected,
+                unit.connected_interface_type,
+            )
+
         was = self._effective_unit_connected(previous.is_connected)
         now = self._effective_unit_connected(unit.is_connected)
         if was and not now:
@@ -377,11 +399,11 @@ class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
             )
 
     def _log_unit_connectivity_transitions(self, context: UserContext) -> None:
-        """Warn once per connected↔disconnected transition for each unit.
+        """Log per-unit MELCloud link first sighting, changes, and WARN flips.
 
-        Compares the new /context units against the previous cache. First
-        sighting of a unit is not a transition. Missing isConnected is treated
-        as connected so a field that appears later as false still logs once.
+        Compares the new /context units against the previous cache. Missing
+        isConnected is treated as connected for WARNING transitions so a field
+        that appears later as false still logs once.
         """
         for building in context.buildings:
             for ata_unit in building.air_to_air_units:

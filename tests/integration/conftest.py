@@ -129,7 +129,7 @@ def create_mock_atw_unit(
     outdoor_temp_last_error: str | None = None,
     time_zone: str | None = None,
     is_connected: bool | None = True,
-    connected_interface_type: int | None = None,
+    connected_interface_type: str | None = None,
 ) -> "AirToWaterUnit":
     """Create a mock AirToWaterUnit for testing.
 
@@ -359,7 +359,7 @@ def create_mock_ata_unit(
     has_swing: bool = True,
     has_air_direction: bool = True,
     is_connected: bool | None = True,
-    connected_interface_type: int | None = None,
+    connected_interface_type: str | None = None,
 ) -> "AirToAirUnit":
     """Create a mock AirToAirUnit for testing."""
     from custom_components.melcloudhome.api.models_ata import (
