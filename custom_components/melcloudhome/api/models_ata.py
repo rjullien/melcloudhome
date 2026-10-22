@@ -17,8 +17,8 @@ from .const_ata import (
 from .parsing import (
     Reading,
     parse_bool as _parse_bool,
+    parse_connected_interface_type as _parse_connected_interface_type,
     parse_float as _parse_float,
-    parse_int as _parse_int,
     parse_optional_bool as _parse_optional_bool,
     strip_line_breaks,
 )
@@ -206,7 +206,8 @@ class AirToAirUnit:
     # Per-unit cloud link from /context (top-level, not settings). None when the
     # field is absent so older/partial payloads do not look disconnected.
     is_connected: bool | None = None
-    connected_interface_type: int | None = None
+    # String label from /context (e.g. "fourthGenWifi"); legacy ints mapped.
+    connected_interface_type: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AirToAirUnit":
@@ -293,5 +294,7 @@ class AirToAirUnit:
             ),
             holiday_mode=ProtectionModeState.from_dict(data.get("holidayMode")),
             is_connected=_parse_optional_bool(data.get("isConnected")),
-            connected_interface_type=_parse_int(data.get("connectedInterfaceType")),
+            connected_interface_type=_parse_connected_interface_type(
+                data.get("connectedInterfaceType")
+            ),
         )

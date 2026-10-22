@@ -21,6 +21,7 @@ from custom_components.melcloudhome.api.models_ata import AirToAirUnit
 from custom_components.melcloudhome.api.models_atw import AirToWaterUnit
 from custom_components.melcloudhome.api.parsing import (
     parse_bool,
+    parse_connected_interface_type,
     parse_int,
     parse_optional_bool,
 )
@@ -67,6 +68,28 @@ class TestParsingUtilities:
         assert parse_optional_bool("True") is True
         assert parse_optional_bool("false") is False
 
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            # Labels from tests/api/cassettes/*.yaml /context bodies.
+            pytest.param("fourthGenWifi", "fourthGenWifi", id="cassette_fourth_gen"),
+            pytest.param("melCloudWiFi", "melCloudWiFi", id="cassette_melcloud_wifi"),
+            # Legacy integers from docs/archive/research/ATW/*.json.
+            pytest.param(2, "fourthGenWifi", id="legacy_int_2"),
+            pytest.param(0, "melCloudWiFi", id="legacy_int_0"),
+            pytest.param("2", "fourthGenWifi", id="legacy_string_2"),
+            pytest.param("0", "melCloudWiFi", id="legacy_string_0"),
+            pytest.param(7, "7", id="unknown_int"),
+            pytest.param(None, None, id="missing"),
+            pytest.param("", None, id="empty"),
+        ],
+    )
+    def test_parse_connected_interface_type(
+        self, raw: object, expected: str | None
+    ) -> None:
+        """Keep cassette labels; map legacy 0/2; other values become str."""
+        assert parse_connected_interface_type(raw) == expected
+
 
 class TestUnitConnectivityParsing:
     """Top-level isConnected / connectedInterfaceType from /context."""
@@ -75,16 +98,25 @@ class TestUnitConnectivityParsing:
         ("payload_extra", "expected_connected", "expected_interface"),
         [
             pytest.param(
-                {"isConnected": True, "connectedInterfaceType": 2},
+                {
+                    "isConnected": True,
+                    "connectedInterfaceType": "fourthGenWifi",
+                },
                 True,
-                2,
-                id="connected",
+                "fourthGenWifi",
+                id="cassette_label",
             ),
             pytest.param(
-                {"isConnected": False, "connectedInterfaceType": 0},
+                {"isConnected": False, "connectedInterfaceType": "melCloudWiFi"},
                 False,
-                0,
-                id="disconnected",
+                "melCloudWiFi",
+                id="cassette_label_disconnected",
+            ),
+            pytest.param(
+                {"isConnected": True, "connectedInterfaceType": 2},
+                True,
+                "fourthGenWifi",
+                id="legacy_int",
             ),
             pytest.param({}, None, None, id="missing"),
         ],
@@ -93,7 +125,7 @@ class TestUnitConnectivityParsing:
         self,
         payload_extra: dict[str, Any],
         expected_connected: bool | None,
-        expected_interface: int | None,
+        expected_interface: str | None,
     ) -> None:
         """ATA units expose per-unit MELCloud link fields from /context."""
         data: dict[str, Any] = {
@@ -106,7 +138,7 @@ class TestUnitConnectivityParsing:
         }
         unit = AirToAirUnit.from_dict(data)
         assert unit.is_connected is expected_connected
-        assert unit.connected_interface_type is expected_interface
+        assert unit.connected_interface_type == expected_interface
 
 
 class TestBooleanParsing:

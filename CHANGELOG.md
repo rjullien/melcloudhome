@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1-rjullien.2] - 2026-10-22
+
+### Fixed
+
+- `connected_interface_type` now keeps MELCloud's string labels (`fourthGenWifi`, `melCloudWiFi`) instead of reading as null. Older integer values `0` / `2` map to those labels. An INFO log line names each unit's `isConnected` and interface type when first seen or when that pair changes. (fork)
+
 ## [2.6.1-rjullien.1] - 2026-10-22
 
 ### Changed

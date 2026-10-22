@@ -104,8 +104,8 @@ async def test_error_state_sensor_error_code_none_when_no_error(
 @pytest.mark.parametrize(
     ("is_connected", "interface_type", "expected_state"),
     [
-        pytest.param(True, 2, STATE_ON, id="connected"),
-        pytest.param(False, 0, STATE_OFF, id="disconnected"),
+        pytest.param(True, "fourthGenWifi", STATE_ON, id="connected"),
+        pytest.param(False, "melCloudWiFi", STATE_OFF, id="disconnected"),
         # Missing isConnected must not look offline (older/partial payloads).
         pytest.param(None, None, STATE_ON, id="missing_treated_as_connected"),
     ],
@@ -113,7 +113,7 @@ async def test_error_state_sensor_error_code_none_when_no_error(
 async def test_connection_state_sensor_reflects_unit_is_connected(
     hass: HomeAssistant,
     is_connected: bool | None,
-    interface_type: int | None,
+    interface_type: str | None,
     expected_state: str,
 ) -> None:
     """Connection state follows per-unit isConnected from /context, not cloud reachability."""
@@ -131,7 +131,7 @@ async def test_connection_state_sensor_reflects_unit_is_connected(
     assert state is not None
     assert state.state == expected_state
     assert state.attributes["is_connected"] is is_connected
-    assert state.attributes["connected_interface_type"] is interface_type
+    assert state.attributes["connected_interface_type"] == interface_type
 
 
 @pytest.mark.asyncio
@@ -140,13 +140,26 @@ async def test_connection_state_updates_when_unit_disconnects(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Connection state flips off when a later /context poll reports isConnected=false."""
-    mock_context = create_mock_ata_user_context()
-    _, mock_client = await setup_ata_integration_custom(hass, mock_context)
+    unit = create_mock_ata_unit(
+        is_connected=True, connected_interface_type="fourthGenWifi"
+    )
+    mock_context = create_mock_ata_user_context(
+        [create_mock_ata_building(units=[unit])]
+    )
+    with caplog.at_level("INFO"):
+        _, mock_client = await setup_ata_integration_custom(hass, mock_context)
 
     connection_sensor_id = "binary_sensor.melcloudhome_a1b2_9abc_connection_state"
     assert hass.states.get(connection_sensor_id).state == STATE_ON
+    assert any(
+        "MELCloud link: isConnected=True" in record.getMessage()
+        and "fourthGenWifi" in record.getMessage()
+        for record in caplog.records
+    )
 
-    disconnected = create_mock_ata_unit(is_connected=False, connected_interface_type=2)
+    disconnected = create_mock_ata_unit(
+        is_connected=False, connected_interface_type="fourthGenWifi"
+    )
     mock_client.get_user_context = AsyncMock(
         return_value=create_mock_ata_user_context(
             [create_mock_ata_building(units=[disconnected])]
@@ -155,7 +168,8 @@ async def test_connection_state_updates_when_unit_disconnects(
 
     from custom_components.melcloudhome.const import DOMAIN
 
-    with caplog.at_level("WARNING"):
+    caplog.clear()
+    with caplog.at_level("INFO"):
         await hass.services.async_call(DOMAIN, "force_refresh", {}, blocking=True)
         await hass.async_block_till_done()
 
@@ -167,16 +181,22 @@ async def test_connection_state_updates_when_unit_disconnects(
         "lost connection to MELCloud" in record.getMessage()
         for record in caplog.records
     )
+    assert any(
+        "MELCloud link changed: isConnected=False" in record.getMessage()
+        for record in caplog.records
+    )
 
     # Reconnect: one recovery WARNING, sensor back on.
-    reconnected = create_mock_ata_unit(is_connected=True, connected_interface_type=2)
+    reconnected = create_mock_ata_unit(
+        is_connected=True, connected_interface_type="fourthGenWifi"
+    )
     mock_client.get_user_context = AsyncMock(
         return_value=create_mock_ata_user_context(
             [create_mock_ata_building(units=[reconnected])]
         )
     )
     caplog.clear()
-    with caplog.at_level("WARNING"):
+    with caplog.at_level("INFO"):
         await hass.services.async_call(DOMAIN, "force_refresh", {}, blocking=True)
         await hass.async_block_till_done()
 
@@ -185,13 +205,15 @@ async def test_connection_state_updates_when_unit_disconnects(
         "reconnected to MELCloud" in record.getMessage() for record in caplog.records
     )
 
-    # Same connected state again: no further transition WARNINGs.
+    # Same pair again: no further INFO/WARNING spam.
     caplog.clear()
-    with caplog.at_level("WARNING"):
+    with caplog.at_level("INFO"):
         await hass.services.async_call(DOMAIN, "force_refresh", {}, blocking=True)
         await hass.async_block_till_done()
     assert not any(
-        "connection to MELCloud" in record.getMessage() for record in caplog.records
+        "MELCloud link" in record.getMessage()
+        or "connection to MELCloud" in record.getMessage()
+        for record in caplog.records
     )
 
 

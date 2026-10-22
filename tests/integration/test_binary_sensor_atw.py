@@ -39,15 +39,15 @@ async def test_atw_error_state_sensor_created(hass: HomeAssistant) -> None:
 @pytest.mark.parametrize(
     ("is_connected", "interface_type", "expected_state"),
     [
-        pytest.param(True, 0, STATE_ON, id="connected"),
-        pytest.param(False, 2, STATE_OFF, id="disconnected"),
+        pytest.param(True, "melCloudWiFi", STATE_ON, id="connected"),
+        pytest.param(False, "fourthGenWifi", STATE_OFF, id="disconnected"),
         pytest.param(None, None, STATE_ON, id="missing_treated_as_connected"),
     ],
 )
 async def test_atw_connection_state_reflects_unit_is_connected(
     hass: HomeAssistant,
     is_connected: bool | None,
-    interface_type: int | None,
+    interface_type: str | None,
     expected_state: str,
 ) -> None:
     """ATW connection state follows per-unit isConnected from /context."""
@@ -64,7 +64,7 @@ async def test_atw_connection_state_reflects_unit_is_connected(
     assert state is not None
     assert state.state == expected_state
     assert state.attributes["is_connected"] is is_connected
-    assert state.attributes["connected_interface_type"] is interface_type
+    assert state.attributes["connected_interface_type"] == interface_type
 
 
 @pytest.mark.asyncio
@@ -72,7 +72,9 @@ async def test_atw_connection_state_updates_when_unit_disconnects(
     hass: HomeAssistant,
 ) -> None:
     """ATW connection state flips off when /context reports isConnected=false."""
-    mock_unit = create_mock_atw_unit(is_connected=True)
+    mock_unit = create_mock_atw_unit(
+        is_connected=True, connected_interface_type="melCloudWiFi"
+    )
     mock_context = create_mock_atw_user_context(
         [create_mock_atw_building(units=[mock_unit])]
     )
@@ -81,7 +83,9 @@ async def test_atw_connection_state_updates_when_unit_disconnects(
     connection_sensor_id = "binary_sensor.melcloudhome_0efc_9abc_connection_state"
     assert hass.states.get(connection_sensor_id).state == STATE_ON
 
-    disconnected = create_mock_atw_unit(is_connected=False, connected_interface_type=0)
+    disconnected = create_mock_atw_unit(
+        is_connected=False, connected_interface_type="melCloudWiFi"
+    )
     mock_client.get_user_context = AsyncMock(
         return_value=create_mock_atw_user_context(
             [create_mock_atw_building(units=[disconnected])]

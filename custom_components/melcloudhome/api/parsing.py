@@ -50,6 +50,37 @@ def parse_optional_bool(value: str | bool | None) -> bool | None:
     return parse_bool(value)
 
 
+# Legacy /context integers → current string labels (cassette + archive pair).
+# Observed: 2 ↔ fourthGenWifi, 0 ↔ melCloudWiFi.
+_CONNECTED_INTERFACE_TYPE_LEGACY: dict[int, str] = {
+    0: "melCloudWiFi",
+    2: "fourthGenWifi",
+}
+
+
+def parse_connected_interface_type(value: object) -> str | None:
+    """Parse ``connectedInterfaceType`` from /context as a string label.
+
+    Current API responses use labels such as ``fourthGenWifi`` and
+    ``melCloudWiFi`` (see VCR cassettes). Older captures used integers
+    ``0`` / ``2`` for those same interfaces; those map to the labels.
+    Any other present value becomes ``str(value)``. Absent / empty → None.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int):
+        return _CONNECTED_INTERFACE_TYPE_LEGACY.get(value, str(value))
+    if isinstance(value, str):
+        try:
+            as_int = int(value)
+        except ValueError:
+            return value
+        return _CONNECTED_INTERFACE_TYPE_LEGACY.get(as_int, value)
+    return str(value)
+
+
 def parse_float(value: str | float | None) -> float | None:
     """Parse float from API string value.
 
