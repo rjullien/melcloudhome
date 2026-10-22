@@ -49,9 +49,7 @@ def test_effective_connection_uses_rest_after_disagree_streak() -> None:
 def test_reconcile_logs_once_and_clears_overlay() -> None:
     coord = _coordinator()
     unit = create_mock_ata_unit(unit_id="u1", is_connected=True, name="Salon")
-    context = create_mock_ata_user_context(
-        [create_mock_ata_building(units=[unit])]
-    )
+    context = create_mock_ata_user_context([create_mock_ata_building(units=[unit])])
     coord._unit_comm["u1"] = _UnitCommOverlay(ws_is_connected=False, disagree_polls=1)
     coord._reconcile_unit_communication(context)
     overlay = coord._unit_comm["u1"]

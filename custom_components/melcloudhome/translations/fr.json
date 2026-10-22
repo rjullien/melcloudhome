@@ -214,6 +214,15 @@
       },
       "cop": {
         "name": "Coefficient de performance"
+      },
+      "vane_vertical_direction": {
+        "name": "Volet vertical"
+      },
+      "vane_horizontal_direction": {
+        "name": "Volet horizontal"
+      },
+      "error_code": {
+        "name": "Code erreur"
       }
     },
     "fan": {

@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Coeficiente de rendimiento"
+      },
+      "vane_vertical_direction": {
+        "name": "Lama vertical"
+      },
+      "vane_horizontal_direction": {
+        "name": "Lama horizontal"
+      },
+      "error_code": {
+        "name": "Código de error"
       }
     },
     "binary_sensor": {

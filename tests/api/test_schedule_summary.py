@@ -28,8 +28,6 @@ def test_next_entry_label() -> None:
             "power": False,
         },
     ]
-    count, nxt = summarize_cloud_schedule(
-        schedule, "Europe/Paris", now=now
-    )
+    count, nxt = summarize_cloud_schedule(schedule, "Europe/Paris", now=now)
     assert count == 2
     assert nxt == "Wed 18:30"

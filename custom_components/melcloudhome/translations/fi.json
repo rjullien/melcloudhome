@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Hyötysuhde (COP)"
+      },
+      "vane_vertical_direction": {
+        "name": "Pystysuuntainen siiveke"
+      },
+      "vane_horizontal_direction": {
+        "name": "Vaakasuuntainen siiveke"
+      },
+      "error_code": {
+        "name": "Virhekoodi"
       }
     },
     "binary_sensor": {

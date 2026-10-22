@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Effektfaktor (COP)"
+      },
+      "vane_vertical_direction": {
+        "name": "Vertikal spjeld"
+      },
+      "vane_horizontal_direction": {
+        "name": "Horisontal spjeld"
+      },
+      "error_code": {
+        "name": "Feilkode"
       }
     },
     "binary_sensor": {

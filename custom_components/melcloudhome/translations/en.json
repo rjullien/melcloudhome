@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Coefficient of performance"
+      },
+      "vane_vertical_direction": {
+        "name": "Vertical vane"
+      },
+      "vane_horizontal_direction": {
+        "name": "Horizontal vane"
+      },
+      "error_code": {
+        "name": "Error code"
       }
     },
     "binary_sensor": {
