@@ -48,13 +48,18 @@ ATA_BINARY_SENSOR_TYPES: tuple[ATABinarySensorEntityDescription, ...] = (
         value_fn=lambda unit: unit.is_in_error,
         attributes_fn=lambda unit: {"error_code": unit.error_code},
     ),
-    # Connection state - indicates if device is connected and responding
-    # This will be handled differently as it depends on coordinator status
+    # Connection state - unit linked to MELCloud (isConnected from /context).
+    # Missing isConnected is treated as connected so older payloads do not
+    # flip every install to "off"; the raw value stays on the attributes.
     ATABinarySensorEntityDescription(
         key="connection_state",
         translation_key="connection_state",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
-        value_fn=lambda unit: True,  # Connection is determined by coordinator
+        value_fn=lambda unit: True if unit.is_connected is None else unit.is_connected,
+        attributes_fn=lambda unit: {
+            "is_connected": unit.is_connected,
+            "connected_interface_type": unit.connected_interface_type,
+        },
     ),
     # Protection modes. Overheat protection and holiday mode are only created
     # once a unit has ever had the mode configured (the API leaves those
@@ -133,11 +138,6 @@ class ATABinarySensor(
     @property
     def is_on(self) -> bool:
         """Return true if the binary sensor is on."""
-        # For connection state, we check coordinator status
-        if self.entity_description.key == "connection_state":
-            return bool(self.coordinator.last_update_success)
-
-        # For other sensors, use the value function
         device = self.coordinator.get_ata_device(self._unit_id)
         if device is None:
             return False

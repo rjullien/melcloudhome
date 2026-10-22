@@ -128,6 +128,8 @@ def create_mock_atw_unit(
     has_outdoor_temp_sensor: bool = False,
     outdoor_temp_last_error: str | None = None,
     time_zone: str | None = None,
+    is_connected: bool | None = True,
+    connected_interface_type: int | None = None,
 ) -> "AirToWaterUnit":
     """Create a mock AirToWaterUnit for testing.
 
@@ -172,6 +174,8 @@ def create_mock_atw_unit(
         outdoor_temp_reading=outdoor_temp_reading,
         has_outdoor_temp_sensor=has_outdoor_temp_sensor,
         outdoor_temp_last_error=outdoor_temp_last_error,
+        is_connected=is_connected,
+        connected_interface_type=connected_interface_type,
         capabilities=AirToWaterCapabilities(
             has_zone2=has_zone2,
             has_boiler=has_boiler,
@@ -354,6 +358,8 @@ def create_mock_ata_unit(
     number_of_fan_speeds: int = 5,
     has_swing: bool = True,
     has_air_direction: bool = True,
+    is_connected: bool | None = True,
+    connected_interface_type: int | None = None,
 ) -> "AirToAirUnit":
     """Create a mock AirToAirUnit for testing."""
     from custom_components.melcloudhome.api.models_ata import (
@@ -388,6 +394,8 @@ def create_mock_ata_unit(
         frost_protection=frost_protection,
         overheat_protection=overheat_protection,
         holiday_mode=holiday_mode,
+        is_connected=is_connected,
+        connected_interface_type=connected_interface_type,
     )
 
 

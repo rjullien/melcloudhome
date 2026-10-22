@@ -22,6 +22,7 @@ from custom_components.melcloudhome.api.models_atw import AirToWaterUnit
 from custom_components.melcloudhome.api.parsing import (
     parse_bool,
     parse_int,
+    parse_optional_bool,
 )
 
 
@@ -57,6 +58,55 @@ class TestParsingUtilities:
         """Test parse_int handles int input directly."""
         assert parse_int(42) == 42
         assert parse_int(0) == 0
+
+    def test_parse_optional_bool_keeps_none(self) -> None:
+        """Absence must stay None so missing isConnected is not disconnected."""
+        assert parse_optional_bool(None) is None
+        assert parse_optional_bool(True) is True
+        assert parse_optional_bool(False) is False
+        assert parse_optional_bool("True") is True
+        assert parse_optional_bool("false") is False
+
+
+class TestUnitConnectivityParsing:
+    """Top-level isConnected / connectedInterfaceType from /context."""
+
+    @pytest.mark.parametrize(
+        ("payload_extra", "expected_connected", "expected_interface"),
+        [
+            pytest.param(
+                {"isConnected": True, "connectedInterfaceType": 2},
+                True,
+                2,
+                id="connected",
+            ),
+            pytest.param(
+                {"isConnected": False, "connectedInterfaceType": 0},
+                False,
+                0,
+                id="disconnected",
+            ),
+            pytest.param({}, None, None, id="missing"),
+        ],
+    )
+    def test_ata_from_dict_parses_is_connected(
+        self,
+        payload_extra: dict[str, Any],
+        expected_connected: bool | None,
+        expected_interface: int | None,
+    ) -> None:
+        """ATA units expose per-unit MELCloud link fields from /context."""
+        data: dict[str, Any] = {
+            "id": "test-unit",
+            "givenDisplayName": "Salon",
+            "settings": [{"name": "Power", "value": "True"}],
+            "capabilities": {},
+            "schedule": [],
+            **payload_extra,
+        }
+        unit = AirToAirUnit.from_dict(data)
+        assert unit.is_connected is expected_connected
+        assert unit.connected_interface_type is expected_interface
 
 
 class TestBooleanParsing:

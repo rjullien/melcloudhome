@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1-rjullien.1] - 2026-10-22
+
+### Changed
+
+- The per-unit **Connection state** binary sensor now reports whether that unit is linked to MELCloud (`isConnected` from `/context`), not whether Home Assistant can reach the cloud API. Entity IDs and unique IDs are unchanged. Attributes `is_connected` and `connected_interface_type` expose the raw fields. If `isConnected` is missing from a payload, the sensor stays on so installs with older responses do not flip to offline. Climate and other entities stay available when a unit is disconnected; a WARNING is logged once on each connected↔disconnected transition. (fork)
+
 ## [2.6.1] - 2026-10-09
 
 ### Changed
