@@ -5,9 +5,14 @@ WebSocket the official app uses and reports per-unit ``unitStateChanged``
 deltas so out-of-band changes (physical remote, MELCloud app, another HA
 instance) surface without waiting for the next poll.
 
+Also surfaces ``unitCommunicationLost`` / ``unitCommunicationRestored`` so the
+per-unit connection_state binary sensor can update immediately; the 60 s
+``isConnected`` poll remains the source of truth when the two disagree
+(coordinator reconciles).
+
 Deliberately HA-agnostic: it manages a single long-running ``run()`` coroutine
 and knows nothing about Home Assistant. The coordinator owns the task lifecycle
-and decides what to do with each delta (v1: trigger a coordinator refresh).
+and decides what to do with each event.
 
 Best-effort by design — any failure (token endpoint down, handshake refused,
 hash expired) just backs off and retries; REST polling remains the source of
@@ -23,12 +28,13 @@ import logging
 import random
 import time
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import aiohttp
 
 from .auth import _redact_url
-from .parsing import strip_line_breaks
+from .parsing import parse_api_timestamp, strip_line_breaks
 
 if TYPE_CHECKING:
     from .client import MELCloudHomeClient
@@ -47,10 +53,17 @@ _HEARTBEAT = 30
 # refresh.
 _STABLE_SESSION_SECS = 60
 
+_COMM_LOST = "unitCommunicationLost"
+_COMM_RESTORED = "unitCommunicationRestored"
+_STATE_CHANGED = "unitStateChanged"
+_KNOWN_MESSAGE_TYPES = frozenset({_STATE_CHANGED, _COMM_LOST, _COMM_RESTORED})
+
 
 # Callback invoked for each unit that reports a state change:
 # (unit_id, [changed setting names]).
 DeltaHandler = Callable[[str, list[str]], Awaitable[None]]
+# (unit_id, connected, event_timestamp_or_None) for communication lost/restored.
+CommHandler = Callable[[str, bool, datetime | None], Awaitable[None]]
 # Sync callback invoked when the connection state flips (True = connected).
 StateHandler = Callable[[bool], None]
 
@@ -63,16 +76,20 @@ class MELCloudHomeWebSocket:
         client: MELCloudHomeClient,
         on_delta: DeltaHandler,
         on_state_change: StateHandler | None = None,
+        on_communication: CommHandler | None = None,
     ) -> None:
-        """Initialise with an authenticated client and a delta callback."""
+        """Initialise with an authenticated client and callbacks."""
         self._client = client
         self._on_delta = on_delta
         self._on_state_change = on_state_change
+        self._on_communication = on_communication
         self._closing = False
         self._connected = False
         self._ever_connected = False
         self._reconnect_count = 0
         self._backoff = _INITIAL_BACKOFF
+        # Log each unknown messageType at most once per listener lifetime.
+        self._unknown_message_types_logged: set[str] = set()
 
     @property
     def connected(self) -> bool:
@@ -169,8 +186,41 @@ class MELCloudHomeWebSocket:
                     break
         _LOGGER.debug("WebSocket disconnected")
 
+    def _log_unknown_message_type(self, message_type: object, item: dict) -> None:
+        """Log an unrecognised frame shape once at INFO."""
+        key = str(message_type) if message_type is not None else "<missing>"
+        if key in self._unknown_message_types_logged:
+            return
+        self._unknown_message_types_logged.add(key)
+        _LOGGER.info(
+            "Ignoring unknown WebSocket messageType %r (keys=%s); "
+            "further frames of this type will not be logged",
+            key,
+            sorted(item.keys()),
+        )
+
+    @staticmethod
+    def _parse_comm_timestamp(raw: object) -> datetime | None:
+        """Parse the communication-event timestamp; None if missing/bad."""
+        if not isinstance(raw, str) or not raw:
+            return None
+        try:
+            return parse_api_timestamp(raw)
+        except ValueError:
+            return None
+
+    async def _dispatch_communication(
+        self, unit_id: str, connected: bool, timestamp: datetime | None
+    ) -> None:
+        if self._on_communication is None:
+            return
+        try:
+            await self._on_communication(unit_id, connected, timestamp)
+        except Exception:
+            _LOGGER.debug("WebSocket communication handler failed", exc_info=True)
+
     async def _handle_text(self, raw: str) -> None:
-        """Parse a text frame and dispatch any per-unit deltas."""
+        """Parse a text frame and dispatch state or communication events."""
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
@@ -180,8 +230,11 @@ class MELCloudHomeWebSocket:
         for item in items:
             if not isinstance(item, dict):
                 continue
-            if item.get("messageType") != "unitStateChanged":
+            message_type = item.get("messageType")
+            if message_type not in _KNOWN_MESSAGE_TYPES:
+                self._log_unknown_message_type(message_type, item)
                 continue
+
             data = item.get("Data") or item.get("data") or {}
             if not isinstance(data, dict):
                 # One malformed frame must not tear down the whole session.
@@ -189,6 +242,20 @@ class MELCloudHomeWebSocket:
             unit_id = data.get("id")
             if not unit_id:
                 continue
+            unit_id = strip_line_breaks(str(unit_id))
+
+            if message_type in (_COMM_LOST, _COMM_RESTORED):
+                # Documented shape: Data.id + Data.timestamp (local offset).
+                # Tolerate Timestamp / missing timestamp defensively.
+                ts_raw = data.get("timestamp") or data.get("Timestamp")
+                await self._dispatch_communication(
+                    unit_id,
+                    message_type == _COMM_RESTORED,
+                    self._parse_comm_timestamp(ts_raw),
+                )
+                continue
+
+            # unitStateChanged
             settings = data.get("settings")
             names = [
                 strip_line_breaks(s["name"])
@@ -196,7 +263,7 @@ class MELCloudHomeWebSocket:
                 if isinstance(s, dict) and s.get("name")
             ]
             try:
-                await self._on_delta(strip_line_breaks(unit_id), names)
+                await self._on_delta(unit_id, names)
             except Exception:
                 # A misbehaving handler must never kill the listen loop.
                 _LOGGER.debug("WebSocket delta handler failed", exc_info=True)

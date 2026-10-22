@@ -33,6 +33,10 @@ async def test_binary_sensor_entity_creation(hass: HomeAssistant) -> None:
     connection_state = hass.states.get(
         "binary_sensor.melcloudhome_a1b2_9abc_connection_state"
     )
+    standby = hass.states.get("binary_sensor.melcloudhome_a1b2_9abc_standby")
+    cloud_schedule = hass.states.get(
+        "binary_sensor.melcloudhome_a1b2_9abc_cloud_schedule_active"
+    )
 
     assert error_state is not None
     assert error_state.attributes["device_class"] == "problem"
@@ -40,10 +44,15 @@ async def test_binary_sensor_entity_creation(hass: HomeAssistant) -> None:
     assert connection_state is not None
     assert connection_state.attributes["device_class"] == "connectivity"
 
+    assert standby is not None
+    assert cloud_schedule is not None
+
     # translation_key must drive the name, not a title-cased fallback of the
     # entity key (regression test for #240)
     assert error_state.attributes["friendly_name"].endswith("Error state")
     assert connection_state.attributes["friendly_name"].endswith("Connection state")
+    assert standby.attributes["friendly_name"].endswith("Standby")
+    assert cloud_schedule.attributes["friendly_name"].endswith("Cloud schedule active")
 
 
 @pytest.mark.asyncio
@@ -132,6 +141,42 @@ async def test_connection_state_sensor_reflects_unit_is_connected(
     assert state.state == expected_state
     assert state.attributes["is_connected"] is is_connected
     assert state.attributes["connected_interface_type"] == interface_type
+    assert "system_id" in state.attributes
+    assert "is_multi_split_system" in state.attributes
+    assert "last_communication_lost" in state.attributes
+    assert "last_communication_restored" in state.attributes
+
+
+@pytest.mark.asyncio
+async def test_standby_and_cloud_schedule_sensors(hass: HomeAssistant) -> None:
+    """Standby and cloud schedule binary sensors mirror /context fields."""
+    unit = create_mock_ata_unit(
+        in_standby_mode=True,
+        schedule_enabled=True,
+        schedule_entry_count=2,
+        schedule_next="Mon 07:00",
+        system_id="LLLLLLLL-LLLL-LLLL-LLLL-LLLLLLLLLLLL",
+        is_multi_split_system=True,
+    )
+    mock_context = create_mock_ata_user_context(
+        [create_mock_ata_building(units=[unit])]
+    )
+    await setup_ata_integration_custom(hass, mock_context)
+
+    standby = hass.states.get("binary_sensor.melcloudhome_a1b2_9abc_standby")
+    schedule = hass.states.get(
+        "binary_sensor.melcloudhome_a1b2_9abc_cloud_schedule_active"
+    )
+    connection = hass.states.get(
+        "binary_sensor.melcloudhome_a1b2_9abc_connection_state"
+    )
+    assert standby is not None and standby.state == STATE_ON
+    assert schedule is not None and schedule.state == STATE_ON
+    assert schedule.attributes["schedule_entry_count"] == 2
+    assert schedule.attributes["schedule_next"] == "Mon 07:00"
+    assert connection is not None
+    assert connection.attributes["system_id"] == "LLLLLLLL-LLLL-LLLL-LLLL-LLLLLLLLLLLL"
+    assert connection.attributes["is_multi_split_system"] is True
 
 
 @pytest.mark.asyncio

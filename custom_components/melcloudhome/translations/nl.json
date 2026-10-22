@@ -208,6 +208,12 @@
       },
       "holiday_mode": {
         "name": "Vakantiemodus"
+      },
+      "standby": {
+        "name": "Stand-by"
+      },
+      "cloud_schedule": {
+        "name": "Cloudschema actief"
       }
     },
     "fan": {

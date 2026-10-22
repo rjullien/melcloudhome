@@ -280,6 +280,65 @@ async def test_hvac_action_cooling_when_temp_above_target(hass: HomeAssistant) -
 
 
 @pytest.mark.asyncio
+async def test_hvac_action_auto_standby_is_preheating(hass: HomeAssistant) -> None:
+    """Auto + InStandbyMode → preheating, not cooling from room vs setpoint."""
+    mock_unit = create_mock_ata_unit(
+        operation_mode="Automatic",
+        set_temperature=21.0,
+        room_temperature=23.0,
+        in_standby_mode=True,
+    )
+    mock_context = create_mock_ata_user_context(
+        [create_mock_ata_building(units=[mock_unit])]
+    )
+    await setup_ata_integration_custom(hass, mock_context)
+
+    state = hass.states.get(_CLIMATE_ENTITY)
+    assert state is not None
+    assert state.attributes["hvac_action"] == HVACAction.PREHEATING
+    assert state.attributes["in_standby_mode"] is True
+
+
+@pytest.mark.asyncio
+async def test_hvac_action_auto_heating_temps_is_idle(hass: HomeAssistant) -> None:
+    """Auto without standby does not infer heating from temperatures."""
+    mock_unit = create_mock_ata_unit(
+        operation_mode="Automatic",
+        set_temperature=21.0,
+        room_temperature=19.0,
+        in_standby_mode=False,
+    )
+    mock_context = create_mock_ata_user_context(
+        [create_mock_ata_building(units=[mock_unit])]
+    )
+    await setup_ata_integration_custom(hass, mock_context)
+
+    state = hass.states.get(_CLIMATE_ENTITY)
+    assert state is not None
+    assert state.attributes["hvac_action"] == HVACAction.IDLE
+    assert state.attributes["in_standby_mode"] is False
+
+
+@pytest.mark.asyncio
+async def test_hvac_action_auto_cooling_temps_is_idle(hass: HomeAssistant) -> None:
+    """Auto without standby does not infer cooling from temperatures."""
+    mock_unit = create_mock_ata_unit(
+        operation_mode="Automatic",
+        set_temperature=21.0,
+        room_temperature=23.0,
+        in_standby_mode=False,
+    )
+    mock_context = create_mock_ata_user_context(
+        [create_mock_ata_building(units=[mock_unit])]
+    )
+    await setup_ata_integration_custom(hass, mock_context)
+
+    state = hass.states.get(_CLIMATE_ENTITY)
+    assert state is not None
+    assert state.attributes["hvac_action"] == HVACAction.IDLE
+
+
+@pytest.mark.asyncio
 async def test_device_unavailable_when_in_error_state(hass: HomeAssistant) -> None:
     """Test that device shows as unavailable when in error state."""
     mock_unit = create_mock_ata_unit(is_in_error=True)

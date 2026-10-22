@@ -145,6 +145,85 @@ def parse_api_timestamp(value: str, tz: tzinfo = UTC) -> datetime:
     return parsed.astimezone(UTC)
 
 
+# MELCloud schedule days: 0=Sunday … 6=Saturday (confirmed in ata-api-reference).
+_SCHEDULE_DAY_LABELS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+
+def _schedule_tz(time_zone_name: str | None) -> tzinfo:
+    """Best-effort IANA zone for schedule next-entry math; UTC on failure."""
+    if not time_zone_name:
+        return UTC
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(time_zone_name)
+    except Exception:
+        return UTC
+
+
+def summarize_cloud_schedule(
+    schedule: object,
+    time_zone_name: str | None = None,
+    *,
+    now: datetime | None = None,
+) -> tuple[int, str | None]:
+    """Return ``(entry_count, next_entry_label)`` for a /context schedule list.
+
+    ``next_entry_label`` is a short wall-clock string such as ``Mon 07:00`` when
+    at least one entry has parseable ``days`` + ``time``; otherwise None.
+    """
+    if not isinstance(schedule, list):
+        return 0, None
+    entries = [e for e in schedule if isinstance(e, dict)]
+    count = len(entries)
+    if count == 0:
+        return 0, None
+
+    tz = _schedule_tz(time_zone_name)
+    local_now = now.astimezone(tz) if now is not None else datetime.now(tz)
+    best: datetime | None = None
+
+    for entry in entries:
+        days = entry.get("days")
+        time_str = entry.get("time")
+        if not isinstance(days, list) or not isinstance(time_str, str):
+            continue
+        parts = time_str.split(":")
+        try:
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+        except (ValueError, IndexError):
+            continue
+        day_set = {d for d in days if isinstance(d, int) and 0 <= d <= 6}
+        if not day_set:
+            continue
+        for offset in range(8):
+            candidate_date = local_now.date() + timedelta(days=offset)
+            # datetime.weekday: Mon=0 … Sun=6 → MELCloud: Sun=0 … Sat=6
+            melcloud_day = (candidate_date.weekday() + 1) % 7
+            if melcloud_day not in day_set:
+                continue
+            candidate = datetime(
+                candidate_date.year,
+                candidate_date.month,
+                candidate_date.day,
+                hour,
+                minute,
+                tzinfo=tz,
+            )
+            if candidate <= local_now:
+                continue
+            if best is None or candidate < best:
+                best = candidate
+            break
+
+    if best is None:
+        return count, None
+    melcloud_day = (best.weekday() + 1) % 7
+    label = f"{_SCHEDULE_DAY_LABELS[melcloud_day]} {best.strftime('%H:%M')}"
+    return count, label
+
+
 _ENERGY_DATASETS = {
     "interval_energy_consumed": "consumed",
     "interval_energy_produced": "produced",

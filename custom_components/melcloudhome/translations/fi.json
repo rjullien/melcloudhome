@@ -208,6 +208,12 @@
       },
       "holiday_mode": {
         "name": "Lomatila"
+      },
+      "standby": {
+        "name": "Valmiustila"
+      },
+      "cloud_schedule": {
+        "name": "Pilviaikataulu käytössä"
       }
     },
     "fan": {

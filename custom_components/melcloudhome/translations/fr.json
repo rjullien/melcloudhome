@@ -120,6 +120,12 @@
       },
       "holiday_mode": {
         "name": "Mode vacances"
+      },
+      "standby": {
+        "name": "En attente"
+      },
+      "cloud_schedule": {
+        "name": "Programmation cloud active"
       }
     },
     "sensor": {

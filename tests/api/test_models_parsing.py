@@ -140,6 +140,35 @@ class TestUnitConnectivityParsing:
         assert unit.is_connected is expected_connected
         assert unit.connected_interface_type == expected_interface
 
+    def test_ata_from_dict_parses_schedule_and_system(self) -> None:
+        """scheduleEnabled, schedule summary, systemId, isMultiSplitSystem."""
+        data: dict[str, Any] = {
+            "id": "test-unit",
+            "givenDisplayName": "Salon",
+            "timeZone": "Europe/Paris",
+            "settings": [
+                {"name": "Power", "value": "True"},
+                {"name": "InStandbyMode", "value": "True"},
+            ],
+            "capabilities": {"isMultiSplitSystem": True},
+            "scheduleEnabled": True,
+            "systemId": "LLLLLLLL-LLLL-LLLL-LLLL-LLLLLLLLLLLL",
+            "schedule": [
+                {
+                    "days": [1, 2, 3, 4, 5],
+                    "time": "07:00:00",
+                    "power": True,
+                }
+            ],
+        }
+        unit = AirToAirUnit.from_dict(data)
+        assert unit.in_standby_mode is True
+        assert unit.schedule_enabled is True
+        assert unit.schedule_entry_count == 1
+        assert unit.schedule_next is not None
+        assert unit.system_id == "LLLLLLLL-LLLL-LLLL-LLLL-LLLLLLLLLLLL"
+        assert unit.capabilities.is_multi_split_system is True
+
 
 class TestBooleanParsing:
     """Test parse_bool helper edge cases via model integration."""

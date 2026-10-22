@@ -7,7 +7,7 @@ implementations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from .api.models import AirToAirUnit, AirToWaterUnit, Building, UserContext
@@ -85,6 +85,18 @@ class CoordinatorProtocol(Protocol):
         Returns:
             Cumulative energy in kWh, or None if not available
         """
+        ...
+
+    def effective_connection_is_on(
+        self, unit_id: str, is_connected: bool | None
+    ) -> bool:
+        """Connection_state on/off with WebSocket communication overlay."""
+        ...
+
+    def connection_state_attributes(
+        self, unit: AirToAirUnit | AirToWaterUnit
+    ) -> dict[str, Any]:
+        """Extra attributes for the per-unit connection_state sensor."""
         ...
 
     # ATA (Air-to-Air) control methods

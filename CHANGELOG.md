@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1-rjullien.3] - 2026-10-22
+
+### Added
+
+- WebSocket `unitCommunicationLost` / `unitCommunicationRestored` update the per-unit **Connection state** binary sensor immediately, with `last_communication_lost` / `last_communication_restored` attributes. The 60 s `isConnected` poll remains the source of truth if the two disagree for more than one poll (one INFO log on disagreement). Unknown WebSocket `messageType` values are logged once at INFO. (fork)
+- ATA **Standby** binary sensor (`InStandbyMode`) and climate attribute `in_standby_mode`. (fork)
+- ATA **Cloud schedule active** binary sensor (`scheduleEnabled`) with `schedule_entry_count` and `schedule_next` attributes. (fork)
+- Connection state attributes `system_id` and (ATA) `is_multi_split_system`. (fork)
+
+### Fixed
+
+- Climate `hvac_action` in Automatic mode no longer guesses heating vs cooling from room vs setpoint (that mis-labelled heating standby / “attente chauffage” as cooling). `InStandbyMode` with Heat or Automatic reports `preheating`; Automatic without standby reports `idle` until MELCloud exposes an actual operating mode. (fork)
+
 ## [2.6.1-rjullien.2] - 2026-10-22
 
 ### Fixed

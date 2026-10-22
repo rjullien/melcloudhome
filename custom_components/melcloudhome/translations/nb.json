@@ -208,6 +208,12 @@
       },
       "holiday_mode": {
         "name": "Feriemodus"
+      },
+      "standby": {
+        "name": "Ventemodus"
+      },
+      "cloud_schedule": {
+        "name": "Skyplan aktiv"
       }
     },
     "fan": {

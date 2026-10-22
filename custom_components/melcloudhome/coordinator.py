@@ -9,6 +9,7 @@ import hashlib
 import inspect
 import logging
 from collections.abc import Awaitable, Callable, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime, tzinfo
 from typing import TYPE_CHECKING, Any
 
@@ -70,6 +71,22 @@ def energy_poll_slot(entry_id: str) -> tuple[int, int]:
     return 20 + h % 8, h // 8 % 60
 
 
+@dataclass
+class _UnitCommOverlay:
+    """Per-unit WebSocket communication overlay for connection_state.
+
+    REST ``isConnected`` remains authoritative when it disagrees with the
+    overlay for more than one consecutive poll (see
+    ``_reconcile_unit_communication``).
+    """
+
+    ws_is_connected: bool | None = None
+    last_communication_lost: datetime | None = None
+    last_communication_restored: datetime | None = None
+    disagree_polls: int = 0
+    disagreement_logged: bool = False
+
+
 class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
     """Class to manage fetching MELCloud Home data."""
 
@@ -109,6 +126,8 @@ class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
         self._websocket: MELCloudHomeWebSocket | None = None
         self._ws_task: asyncio.Task[None] | None = None
         self.ws_last_delta_at: datetime | None = None
+        # Per-unit communicationLost/Restored overlay (feeds connection_state)
+        self._unit_comm: dict[str, _UnitCommOverlay] = {}
         # Re-authentication lock to prevent concurrent re-auth attempts
         self._reauth_lock = asyncio.Lock()
 
@@ -348,12 +367,89 @@ class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
 
         # Update caches for O(1) lookups
         self._rebuild_caches(context)
+        # Reconcile WS communication overlay with REST isConnected
+        self._reconcile_unit_communication(context)
         return context
 
     @staticmethod
     def _effective_unit_connected(is_connected: bool | None) -> bool:
         """Treat a missing isConnected as connected (same as the binary sensor)."""
         return True if is_connected is None else is_connected
+
+    def effective_connection_is_on(
+        self, unit_id: str, is_connected: bool | None
+    ) -> bool:
+        """Return connection_state on/off, preferring a fresh WS overlay.
+
+        While WebSocket and REST disagree, the overlay wins for at most one
+        poll; after that REST wins (see ``_reconcile_unit_communication``).
+        """
+        rest = self._effective_unit_connected(is_connected)
+        overlay = self._unit_comm.get(unit_id)
+        if overlay is None or overlay.ws_is_connected is None:
+            return rest
+        if overlay.ws_is_connected == rest or overlay.disagree_polls > 1:
+            return rest
+        return overlay.ws_is_connected
+
+    def connection_state_attributes(
+        self, unit: AirToAirUnit | AirToWaterUnit
+    ) -> dict[str, Any]:
+        """Attributes for the per-unit connection_state binary sensor."""
+        overlay = self._unit_comm.get(unit.id)
+        attrs: dict[str, Any] = {
+            "is_connected": unit.is_connected,
+            "connected_interface_type": unit.connected_interface_type,
+            "system_id": unit.system_id,
+            "last_communication_lost": (
+                overlay.last_communication_lost.isoformat()
+                if overlay and overlay.last_communication_lost
+                else None
+            ),
+            "last_communication_restored": (
+                overlay.last_communication_restored.isoformat()
+                if overlay and overlay.last_communication_restored
+                else None
+            ),
+        }
+        if isinstance(unit, AirToAirUnit):
+            attrs["is_multi_split_system"] = unit.capabilities.is_multi_split_system
+        return attrs
+
+    def _reconcile_one_unit_communication(
+        self, unit: AirToAirUnit | AirToWaterUnit
+    ) -> None:
+        """Advance disagreement streak for one unit; REST wins after >1 poll."""
+        overlay = self._unit_comm.get(unit.id)
+        if overlay is None or overlay.ws_is_connected is None:
+            return
+        rest = self._effective_unit_connected(unit.is_connected)
+        if rest == overlay.ws_is_connected:
+            overlay.disagree_polls = 0
+            overlay.disagreement_logged = False
+            # Aligned with REST — drop the optimistic override.
+            overlay.ws_is_connected = None
+            return
+        overlay.disagree_polls += 1
+        if overlay.disagree_polls > 1 and not overlay.disagreement_logged:
+            overlay.disagreement_logged = True
+            _LOGGER.info(
+                "%s connection_state: WebSocket communication event "
+                "(%s) disagreed with REST isConnected=%s for more than "
+                "one poll; using REST",
+                unit.name,
+                "restored" if overlay.ws_is_connected else "lost",
+                unit.is_connected,
+            )
+            overlay.ws_is_connected = None
+
+    def _reconcile_unit_communication(self, context: UserContext) -> None:
+        """Advance disagreement streak; REST wins after more than one poll."""
+        for building in context.buildings:
+            for ata_unit in building.air_to_air_units:
+                self._reconcile_one_unit_communication(ata_unit)
+            for atw_unit in building.air_to_water_units:
+                self._reconcile_one_unit_communication(atw_unit)
 
     def _log_connectivity_transition(
         self,
@@ -621,6 +717,7 @@ class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
             self.client,
             on_delta=self._on_ws_delta,
             on_state_change=self._on_ws_state_change,
+            on_communication=self._on_ws_communication,
         )
         # Entry-scoped: HA cancels the task on entry unload/reload, so
         # shutdown needs no manual cancel bookkeeping.
@@ -634,6 +731,36 @@ class MELCloudHomeCoordinator(DataUpdateCoordinator[UserContext]):
         _LOGGER.debug("WebSocket delta for %s: %s", unit_id, changed)
         self.ws_last_delta_at = datetime.now(UTC)
         await self.async_request_refresh_debounced()
+
+    async def _on_ws_communication(
+        self,
+        unit_id: str,
+        connected: bool,
+        event_at: datetime | None,
+    ) -> None:
+        """Apply unitCommunicationLost/Restored immediately to connection_state.
+
+        Unlike unitStateChanged (ADR-019: refresh-only), these frames *are* the
+        connectivity signal, so the overlay updates entity state without waiting
+        for the next /context poll. Poll reconciliation still prefers REST when
+        the two disagree for more than one poll.
+        """
+        overlay = self._unit_comm.setdefault(unit_id, _UnitCommOverlay())
+        overlay.ws_is_connected = connected
+        overlay.disagree_polls = 0
+        overlay.disagreement_logged = False
+        if connected:
+            overlay.last_communication_restored = event_at or datetime.now(UTC)
+        else:
+            overlay.last_communication_lost = event_at or datetime.now(UTC)
+        unit = self._units.get(unit_id) or self._atw_units.get(unit_id)
+        name = unit.name if unit is not None else unit_id
+        _LOGGER.info(
+            "%s WebSocket unit communication %s",
+            name,
+            "restored" if connected else "lost",
+        )
+        self.async_update_listeners()
 
     def _on_ws_state_change(self, connected: bool) -> None:
         """Push the new WebSocket connection state to entities."""

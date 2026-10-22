@@ -11,7 +11,13 @@ class HVACActionDeterminer:
     """Determines HVAC action from device state.
 
     Extracted from climate.py to reduce complexity and improve testability.
-    Uses hysteresis (±0.5°C) to avoid state flapping.
+    Uses hysteresis (±0.5°C) for Heat/Cool modes to avoid state flapping.
+
+    Automatic mode does **not** infer heat vs cool from room vs setpoint: the
+    /context settings list has no actual-operating-mode field in captured
+    payloads, and the temperature heuristic mis-labelled heating-standby
+    ("attente chauffage") as cooling. Standby uses HVACAction.PREHEATING when
+    the selected mode is Heat or Automatic.
     """
 
     HYSTERESIS_THRESHOLD = 0.5  # °C
@@ -38,6 +44,14 @@ class HVACActionDeterminer:
         # If powered off, return OFF
         if not device.power:
             return HVACAction.OFF
+
+        # InStandbyMode: unit is waiting (hot-start / pre-heat / similar).
+        # PREHEATING matches MELCloud's "attente chauffage"; Cool/Dry/Fan
+        # standby has no better HA constant than IDLE.
+        if device.in_standby_mode:
+            if device.operation_mode in ("Heat", "Automatic"):
+                return HVACAction.PREHEATING
+            return HVACAction.IDLE
 
         # Get current and target temperatures
         current_temp = device.room_temperature
@@ -66,6 +80,9 @@ class HVACActionDeterminer:
             return HVACAction.DRYING
         if operation_mode == "Fan":
             return HVACAction.FAN
+        if operation_mode == "Automatic":
+            # No actual heat/cool field in settings — do not guess.
+            return HVACAction.IDLE
         return HVACAction.IDLE
 
     def _determine_action_with_temps(
@@ -99,11 +116,10 @@ class HVACActionDeterminer:
             return HVACAction.IDLE
 
         if operation_mode == "Automatic":
-            # Auto mode: infer based on which direction we need to go
-            if current < target - threshold:
-                return HVACAction.HEATING
-            if current > target + threshold:
-                return HVACAction.COOLING
+            # Captured /context settings have OperationMode=Automatic and
+            # InStandbyMode, but no actual running heat/cool field. Guessing
+            # from room vs setpoint caused false "cooling" during heating
+            # standby — report IDLE while actively thermo-regulating in Auto.
             return HVACAction.IDLE
 
         if operation_mode == "Dry":

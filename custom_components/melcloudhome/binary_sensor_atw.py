@@ -53,9 +53,12 @@ ATW_BINARY_SENSOR_TYPES: tuple[ATWBinarySensorEntityDescription, ...] = (
         translation_key="connection_state",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         value_fn=lambda unit: True if unit.is_connected is None else unit.is_connected,
+        # Attributes come from coordinator.connection_state_attributes (WS
+        # timestamps + system_id); value_fn is only the REST fallback.
         attributes_fn=lambda unit: {
             "is_connected": unit.is_connected,
             "connected_interface_type": unit.connected_interface_type,
+            "system_id": unit.system_id,
         },
     ),
     # Forced DHW active - indicates when DHW has priority over zones
@@ -100,17 +103,23 @@ class ATWBinarySensor(
         device = self.coordinator.get_atw_device(self._unit_id)
         if device is None:
             return None
-
-        return self.entity_description.value_fn(device)
+        if self.entity_description.key == "connection_state":
+            return bool(
+                self.coordinator.effective_connection_is_on(
+                    self._unit_id, device.is_connected
+                )
+            )
+        return bool(self.entity_description.value_fn(device))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes."""
-        if self.entity_description.attributes_fn is None:
-            return None
-
         device = self.coordinator.get_atw_device(self._unit_id)
         if device is None:
+            return None
+        if self.entity_description.key == "connection_state":
+            return dict(self.coordinator.connection_state_attributes(device))
+        if self.entity_description.attributes_fn is None:
             return None
         return self.entity_description.attributes_fn(device)
 
