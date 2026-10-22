@@ -35,6 +35,7 @@ import aiohttp
 
 from .auth import _redact_url
 from .parsing import parse_api_timestamp, strip_line_breaks
+from .raw_unit_debug import log_ata_ws_state_changed
 
 if TYPE_CHECKING:
     from .client import MELCloudHomeClient
@@ -255,7 +256,9 @@ class MELCloudHomeWebSocket:
                 )
                 continue
 
-            # unitStateChanged
+            # unitStateChanged — diagnostic dump before dispatch (DEBUG only).
+            log_ata_ws_state_changed(item)
+
             settings = data.get("settings")
             names = [
                 strip_line_breaks(s["name"])
