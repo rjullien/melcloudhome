@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Leistungskoeffizient"
+      },
+      "vane_vertical_direction": {
+        "name": "Vertikale Lamelle"
+      },
+      "vane_horizontal_direction": {
+        "name": "Horizontale Lamelle"
+      },
+      "error_code": {
+        "name": "Fehlercode"
       }
     },
     "binary_sensor": {

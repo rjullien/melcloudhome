@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Prestatiecoëfficiënt"
+      },
+      "vane_vertical_direction": {
+        "name": "Verticale lamel"
+      },
+      "vane_horizontal_direction": {
+        "name": "Horizontale lamel"
+      },
+      "error_code": {
+        "name": "Foutcode"
       }
     },
     "binary_sensor": {

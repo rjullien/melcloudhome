@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Hệ số hiệu suất"
+      },
+      "vane_vertical_direction": {
+        "name": "Cánh đảo gió dọc"
+      },
+      "vane_horizontal_direction": {
+        "name": "Cánh đảo gió ngang"
+      },
+      "error_code": {
+        "name": "Mã lỗi"
       }
     },
     "binary_sensor": {

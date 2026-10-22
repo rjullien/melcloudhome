@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Συντελεστής απόδοσης"
+      },
+      "vane_vertical_direction": {
+        "name": "Κάθετο πτερύγιο"
+      },
+      "vane_horizontal_direction": {
+        "name": "Οριζόντιο πτερύγιο"
+      },
+      "error_code": {
+        "name": "Κωδικός σφάλματος"
       }
     },
     "binary_sensor": {

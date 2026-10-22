@@ -51,6 +51,13 @@ class ATASensorEntityDescription(SensorEntityDescription):  # type: ignore[misc]
     attribute is added automatically (issue #200).
     """
 
+    available_when_in_error: bool = False
+    """Keep the sensor available while the unit reports IsInError.
+
+    Diagnostic values (ErrorCode, raw vane positions) are most useful exactly
+    when the unit is in error, so they opt out of the error-state gating.
+    """
+
     should_create_fn: Callable[[AirToAirUnit], bool] = lambda x: True
     """Whether to create the sensor at all.
 
@@ -83,6 +90,33 @@ ATA_SENSOR_TYPES: tuple[ATASensorEntityDescription, ...] = (
         value_fn=lambda unit: (
             unit.actual_fan_speed.lower() if unit.actual_fan_speed else None
         ),
+    ),
+    # Raw vane positions from /context (VaneVerticalDirection /
+    # VaneHorizontalDirection). Plain string sensors (not ENUM) so an
+    # unexpected API value never breaks the entity; units without
+    # adjustable vanes still report a value (often "Auto").
+    ATASensorEntityDescription(
+        key="vane_vertical_direction",
+        translation_key="vane_vertical_direction",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        available_when_in_error=True,
+        value_fn=lambda unit: unit.vane_vertical_direction,
+    ),
+    ATASensorEntityDescription(
+        key="vane_horizontal_direction",
+        translation_key="vane_horizontal_direction",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        available_when_in_error=True,
+        value_fn=lambda unit: unit.vane_horizontal_direction,
+    ),
+    # ErrorCode from /context as a first-class entity (the error_state
+    # binary sensor only carries it as an attribute). "none" when empty.
+    ATASensorEntityDescription(
+        key="error_code",
+        translation_key="error_code",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        available_when_in_error=True,
+        value_fn=lambda unit: unit.error_code or "none",
     ),
     # WiFi signal strength - diagnostic sensor for connectivity troubleshooting.
     # dBm from the telemetry rssi series, polled every 30 minutes (ADR-028);
@@ -244,6 +278,9 @@ class ATASensor(CoordinatorEntity[CoordinatorProtocol], SensorEntity):  # type: 
         device = self.coordinator.get_ata_device(self._unit_id)
         if device is None:
             return False
+
+        if self.entity_description.available_when_in_error:
+            return True
 
         # Check if device is in error state
         return not device.is_in_error

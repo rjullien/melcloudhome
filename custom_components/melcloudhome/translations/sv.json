@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Värmefaktor (COP)"
+      },
+      "vane_vertical_direction": {
+        "name": "Vertikalt spjäll"
+      },
+      "vane_horizontal_direction": {
+        "name": "Horisontellt spjäll"
+      },
+      "error_code": {
+        "name": "Felkod"
       }
     },
     "binary_sensor": {

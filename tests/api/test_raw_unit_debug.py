@@ -129,3 +129,24 @@ def test_from_dict_triggers_context_dump(caplog: pytest.LogCaptureFixture) -> No
         unit = AirToAirUnit.from_dict(data)
     assert unit.in_standby_mode is True
     assert any("raw /context" in r.getMessage() for r in caplog.records)
+
+
+def test_capability_flags_containing_hash_are_not_redacted() -> None:
+    """Exact key match: hasHeatOperationMode etc. contain "hash" but are harmless."""
+    raw = {
+        "capabilities": {
+            "hasHeatOperationMode": True,
+            "hasHalfDegreeIncrements": True,
+            "hasHotWater": False,
+        },
+        "hash": "deadbeef",
+        "macAddress": "AA:BB:CC:DD:EE:FF",
+        "refresh_token": "short",
+    }
+    out = redact_for_debug(raw)
+    assert out["capabilities"]["hasHeatOperationMode"] is True
+    assert out["capabilities"]["hasHalfDegreeIncrements"] is True
+    assert out["capabilities"]["hasHotWater"] is False
+    assert out["hash"] == "<redacted>"
+    assert out["macAddress"] == "<redacted>"
+    assert out["refresh_token"] == "<redacted>"

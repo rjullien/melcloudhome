@@ -31,21 +31,30 @@ _MAC_RE = re.compile(
 # Long opaque tokens / hashes (Bearer material, WS hash, etc.).
 # Hyphens excluded so UUIDs (systemId, unit id) stay readable for correlation.
 _TOKENISH_RE = re.compile(r"\b[A-Za-z0-9_+/]{32,}={0,2}\b")
-_SENSITIVE_KEY_FRAGMENTS = (
-    "email",
-    "token",
-    "password",
-    "secret",
-    "authorization",
-    "hash",
-    "serial",
-    "mac",
-    "ssid",
-    "cookie",
-    "bearer",
-    "refresh",
-    "access",
-    "connectedinterfaceidentifier",
+# Exact (normalised: lower-case, no "_"/"-") key names to redact. Exact match,
+# not substring: substring matching redacted harmless capability flags such as
+# hasHeatOperationMode / hasHalfDegreeIncrements ("has"+"h…" contains "hash").
+_SENSITIVE_KEYS = frozenset(
+    {
+        "email",
+        "token",
+        "accesstoken",
+        "refreshtoken",
+        "idtoken",
+        "password",
+        "secret",
+        "clientsecret",
+        "authorization",
+        "hash",
+        "serial",
+        "serialnumber",
+        "mac",
+        "macaddress",
+        "ssid",
+        "cookie",
+        "bearer",
+        "connectedinterfaceidentifier",
+    }
 )
 
 
@@ -59,8 +68,8 @@ def _now_iso() -> str:
 
 
 def _key_is_sensitive(key: str) -> bool:
-    lowered = key.lower().replace("_", "").replace("-", "")
-    return any(frag in lowered for frag in _SENSITIVE_KEY_FRAGMENTS)
+    normalised = key.lower().replace("_", "").replace("-", "")
+    return normalised in _SENSITIVE_KEYS
 
 
 def _redact_string(value: str) -> str:
@@ -125,15 +134,13 @@ def log_ata_context_unit(raw_unit: dict[str, Any]) -> None:
     if not unit_id:
         return
     settings = raw_unit.get("settings")
-    top_level = {
-        k: v for k, v in raw_unit.items() if k != "settings"
-    }
+    top_level = {k: v for k, v in raw_unit.items() if k != "settings"}
     payload = {
         "source": "context",
         "captured_at": _now_iso(),
         "unit_id": unit_id,
         "givenDisplayName": raw_unit.get("givenDisplayName"),
-        "settings": settings if isinstance(settings, list) else settings,
+        "settings": settings,
         "top_level": top_level,
     }
     redacted = redact_for_debug(payload)

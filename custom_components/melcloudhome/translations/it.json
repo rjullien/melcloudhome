@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Coefficiente di prestazione"
+      },
+      "vane_vertical_direction": {
+        "name": "Deflettore verticale"
+      },
+      "vane_horizontal_direction": {
+        "name": "Deflettore orizzontale"
+      },
+      "error_code": {
+        "name": "Codice errore"
       }
     },
     "binary_sensor": {

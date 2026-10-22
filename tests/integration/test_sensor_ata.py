@@ -416,3 +416,41 @@ async def test_actual_fan_speed_sensor_created_when_absent(
     state = hass.states.get("sensor.melcloudhome_a1b2_9abc_actual_fan_speed")
     assert state is not None
     assert state.state == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_vane_and_error_code_sensors(hass: HomeAssistant) -> None:
+    """Vane positions and ErrorCode from /context are exposed as diagnostic sensors."""
+    unit = create_mock_ata_unit(
+        vane_vertical="Swing",
+        vane_horizontal="LeftCentre",
+        is_in_error=True,
+        error_code="E6",
+    )
+    mock_context = create_mock_ata_user_context(
+        [create_mock_ata_building(units=[unit])]
+    )
+    await setup_ata_integration_custom(hass, mock_context)
+
+    vertical = hass.states.get("sensor.melcloudhome_a1b2_9abc_vertical_vane")
+    horizontal = hass.states.get("sensor.melcloudhome_a1b2_9abc_horizontal_vane")
+    error_code = hass.states.get("sensor.melcloudhome_a1b2_9abc_error_code")
+    assert vertical is not None and vertical.state == "Swing"
+    assert horizontal is not None and horizontal.state == "LeftCentre"
+    assert error_code is not None and error_code.state == "E6"
+
+
+@pytest.mark.asyncio
+async def test_error_code_sensor_reports_none_when_empty(
+    hass: HomeAssistant,
+) -> None:
+    """An empty ErrorCode reads "none", not unknown."""
+    unit = create_mock_ata_unit(error_code=None)
+    mock_context = create_mock_ata_user_context(
+        [create_mock_ata_building(units=[unit])]
+    )
+    await setup_ata_integration_custom(hass, mock_context)
+
+    state = hass.states.get("sensor.melcloudhome_a1b2_9abc_error_code")
+    assert state is not None
+    assert state.state == "none"

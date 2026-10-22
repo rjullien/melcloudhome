@@ -185,6 +185,15 @@
       },
       "cop": {
         "name": "Performans katsayısı"
+      },
+      "vane_vertical_direction": {
+        "name": "Dikey kanat"
+      },
+      "vane_horizontal_direction": {
+        "name": "Yatay kanat"
+      },
+      "error_code": {
+        "name": "Hata kodu"
       }
     },
     "binary_sensor": {
