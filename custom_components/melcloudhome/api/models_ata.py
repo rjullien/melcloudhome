@@ -21,6 +21,7 @@ from .parsing import (
     parse_float as _parse_float,
     parse_optional_bool as _parse_optional_bool,
     strip_line_breaks,
+    summarize_cloud_schedule,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -119,6 +120,7 @@ class AirToAirCapabilities:
     has_demand_side_control: bool = False
     supports_wide_vane: bool = False
     has_energy_consumed_meter: bool = False
+    is_multi_split_system: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AirToAirCapabilities":
@@ -150,6 +152,7 @@ class AirToAirCapabilities:
             has_demand_side_control=data.get("hasDemandSideControl", False),
             supports_wide_vane=data.get("supportsWideVane", False),
             has_energy_consumed_meter=data.get("hasEnergyConsumedMeter", False),
+            is_multi_split_system=bool(data.get("isMultiSplitSystem", False)),
         )
 
 
@@ -208,6 +211,13 @@ class AirToAirUnit:
     is_connected: bool | None = None
     # String label from /context (e.g. "fourthGenWifi"); legacy ints mapped.
     connected_interface_type: str | None = None
+    # Cloud schedule master switch + entries from /context (not settings).
+    schedule_enabled: bool = False
+    schedule_entry_count: int = 0
+    # Human-readable next entry when derivable, e.g. "Mon 07:00".
+    schedule_next: str | None = None
+    # Multi-split outdoor grouping id from /context (null/absent → None).
+    system_id: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AirToAirUnit":
@@ -262,6 +272,15 @@ class AirToAirUnit:
         error_code = error_code_value if error_code_value else None
 
         name = strip_line_breaks(data.get("givenDisplayName") or "Unknown")
+        schedule_entry_count, schedule_next = summarize_cloud_schedule(
+            data.get("schedule"), data.get("timeZone")
+        )
+        system_id_raw = data.get("systemId")
+        system_id = (
+            strip_line_breaks(str(system_id_raw))
+            if system_id_raw is not None and str(system_id_raw) != ""
+            else None
+        )
 
         return cls(
             id=data["id"],
@@ -297,4 +316,8 @@ class AirToAirUnit:
             connected_interface_type=_parse_connected_interface_type(
                 data.get("connectedInterfaceType")
             ),
+            schedule_enabled=_parse_bool(data.get("scheduleEnabled")),
+            schedule_entry_count=schedule_entry_count,
+            schedule_next=schedule_next,
+            system_id=system_id,
         )

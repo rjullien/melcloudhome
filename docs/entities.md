@@ -30,7 +30,7 @@ For each air conditioning unit, the following entities are created:
 
 - **Entity ID**: `climate.melcloudhome_{short_id}_climate`
 - **Features**: Power on/off, temperature control, HVAC modes, fan speeds, swing modes
-- **HVAC Action**: Real-time heating/cooling/idle status
+- **HVAC Action**: Heat/Cool from mode + temperature hysteresis; Automatic does not guess heat vs cool from temperatures; `InStandbyMode` with Heat/Automatic → `preheating`. Attribute `in_standby_mode` mirrors the standby binary sensor.
 
 ### Fan Entity
 
@@ -76,7 +76,9 @@ surprises people.
 
 - **Error State**: `binary_sensor.melcloudhome_{short_id}_error_state`
   - Attribute `error_code`: device error code as reported by the API, `null` when no error. The API returns all settings values as strings, so a string is expected, but only the no-error case (empty string) has been observed so far — the exact format of active error codes is unconfirmed
-- **Connection**: `binary_sensor.melcloudhome_{short_id}_connection_state` — on when the unit is linked to MELCloud (`isConnected` from `/context`); missing `isConnected` is treated as on. Attributes: `is_connected` (raw bool or `null`), `connected_interface_type` (string label such as `fourthGenWifi` / `melCloudWiFi`, or `null`). Other entities stay available when this is off.
+- **Connection**: `binary_sensor.melcloudhome_{short_id}_connection_state` — on when the unit is linked to MELCloud (`isConnected` from `/context`); missing `isConnected` is treated as on. WebSocket `unitCommunicationLost` / `unitCommunicationRestored` can flip this immediately; after more than one disagreeing poll, REST `isConnected` wins. Attributes: `is_connected` (raw bool or `null`), `connected_interface_type` (string label such as `fourthGenWifi` / `melCloudWiFi`, or `null`), `system_id`, `is_multi_split_system`, `last_communication_lost`, `last_communication_restored`. Other entities stay available when this is off.
+- **Standby**: `binary_sensor.melcloudhome_{short_id}_standby` (EN; FR UI language may register `_en_attente`) — on when `InStandbyMode` is true (hot-start / pre-heat wait). Also exposed as climate attribute `in_standby_mode`. Unique ID key remains `standby`.
+- **Cloud schedule active**: `binary_sensor.melcloudhome_{short_id}_cloud_schedule_active` (EN; FR UI language may register `_programmation_cloud_active`) — on when `scheduleEnabled` is true. Attributes: `schedule_entry_count`, `schedule_next` (e.g. `Mon 07:00` when derivable). Unique ID key remains `cloud_schedule`.
 - **Frost Protection**: `binary_sensor.melcloudhome_{short_id}_frost_protection` (created when the API reports the `frostProtection` object — every ATA unit does, as a server-side default, whether or not the mode has ever been configured)
   - Attribute `active`: currently engaging (e.g. room has crossed the threshold) — see the min/max sensors above for the configured band
 - **Overheat Protection**: `binary_sensor.melcloudhome_{short_id}_overheat_protection` (only created once ever configured)

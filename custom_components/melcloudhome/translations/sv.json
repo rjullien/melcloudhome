@@ -208,6 +208,12 @@
       },
       "holiday_mode": {
         "name": "Semesterläge"
+      },
+      "standby": {
+        "name": "Standby"
+      },
+      "cloud_schedule": {
+        "name": "Molnschema aktivt"
       }
     },
     "fan": {

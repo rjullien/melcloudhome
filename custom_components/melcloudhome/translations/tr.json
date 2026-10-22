@@ -208,6 +208,12 @@
       },
       "holiday_mode": {
         "name": "Tatil modu"
+      },
+      "standby": {
+        "name": "Standby"
+      },
+      "cloud_schedule": {
+        "name": "Cloud schedule active"
       }
     },
     "fan": {

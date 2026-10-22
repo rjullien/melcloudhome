@@ -208,6 +208,12 @@
       },
       "holiday_mode": {
         "name": "Modalità vacanza"
+      },
+      "standby": {
+        "name": "In attesa"
+      },
+      "cloud_schedule": {
+        "name": "Programmazione cloud attiva"
       }
     },
     "fan": {

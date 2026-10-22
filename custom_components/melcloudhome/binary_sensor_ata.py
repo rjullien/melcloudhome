@@ -51,6 +51,8 @@ ATA_BINARY_SENSOR_TYPES: tuple[ATABinarySensorEntityDescription, ...] = (
     # Connection state - unit linked to MELCloud (isConnected from /context).
     # Missing isConnected is treated as connected so older payloads do not
     # flip every install to "off"; the raw value stays on the attributes.
+    # WebSocket unitCommunicationLost/Restored can update this immediately;
+    # attributes (and effective on/off) come from the coordinator overlay.
     ATABinarySensorEntityDescription(
         key="connection_state",
         translation_key="connection_state",
@@ -59,6 +61,24 @@ ATA_BINARY_SENSOR_TYPES: tuple[ATABinarySensorEntityDescription, ...] = (
         attributes_fn=lambda unit: {
             "is_connected": unit.is_connected,
             "connected_interface_type": unit.connected_interface_type,
+            "system_id": unit.system_id,
+            "is_multi_split_system": unit.capabilities.is_multi_split_system,
+        },
+    ),
+    # InStandbyMode — unit waiting (hot-start / pre-heat / similar).
+    ATABinarySensorEntityDescription(
+        key="standby",
+        translation_key="standby",
+        value_fn=lambda unit: unit.in_standby_mode,
+    ),
+    # Cloud schedule master switch (scheduleEnabled) + short summary attrs.
+    ATABinarySensorEntityDescription(
+        key="cloud_schedule",
+        translation_key="cloud_schedule",
+        value_fn=lambda unit: unit.schedule_enabled,
+        attributes_fn=lambda unit: {
+            "schedule_entry_count": unit.schedule_entry_count,
+            "schedule_next": unit.schedule_next,
         },
     ),
     # Protection modes. Overheat protection and holiday mode are only created
@@ -141,16 +161,23 @@ class ATABinarySensor(
         device = self.coordinator.get_ata_device(self._unit_id)
         if device is None:
             return False
+        if self.entity_description.key == "connection_state":
+            return bool(
+                self.coordinator.effective_connection_is_on(
+                    self._unit_id, device.is_connected
+                )
+            )
         return bool(self.entity_description.value_fn(device))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes."""
-        if self.entity_description.attributes_fn is None:
-            return None
-
         device = self.coordinator.get_ata_device(self._unit_id)
         if device is None:
+            return None
+        if self.entity_description.key == "connection_state":
+            return dict(self.coordinator.connection_state_attributes(device))
+        if self.entity_description.attributes_fn is None:
             return None
         return self.entity_description.attributes_fn(device)
 

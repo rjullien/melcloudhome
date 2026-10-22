@@ -231,6 +231,8 @@ class AirToWaterUnit:
     is_connected: bool | None = None
     # String label from /context (e.g. "fourthGenWifi"); legacy ints mapped.
     connected_interface_type: str | None = None
+    # Outdoor / multi-unit grouping id from /context when present.
+    system_id: str | None = None
 
     # Telemetry data (flow/return temperatures from telemetry API)
     # Populated by TelemetryTracker, read by sensors
@@ -333,5 +335,11 @@ class AirToWaterUnit:
             is_connected=_parse_optional_bool(data.get("isConnected")),
             connected_interface_type=_parse_connected_interface_type(
                 data.get("connectedInterfaceType")
+            ),
+            system_id=(
+                strip_line_breaks(str(system_id_raw))
+                if (system_id_raw := data.get("systemId")) is not None
+                and str(system_id_raw) != ""
+                else None
             ),
         )

@@ -90,10 +90,28 @@ def _delta_frame(
 
 def _make_ws(
     on_delta: AsyncMock | None = None,
+    on_communication: AsyncMock | None = None,
 ) -> tuple[MELCloudHomeWebSocket, AsyncMock]:
     on_delta = on_delta or AsyncMock()
-    ws = MELCloudHomeWebSocket(MagicMock(), on_delta)
+    ws = MELCloudHomeWebSocket(MagicMock(), on_delta, on_communication=on_communication)
     return ws, on_delta
+
+
+def _comm_frame(
+    message_type: str,
+    unit_id: str,
+    timestamp: str = "2026-10-05T17:32:23.447+01:00",
+    *,
+    data_key: str = "Data",
+) -> str:
+    return json.dumps(
+        [
+            {
+                "messageType": message_type,
+                data_key: {"id": unit_id, "timestamp": timestamp},
+            }
+        ]
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -137,10 +155,42 @@ class TestHandleText:
         await ws._handle_text(json.dumps(["a string", 42, None]))
         on_delta.assert_not_awaited()
 
-    async def test_other_message_types_are_ignored(self) -> None:
+    async def test_other_message_types_are_logged_once_and_ignored(self) -> None:
         ws, on_delta = _make_ws()
         raw = json.dumps([{"messageType": "somethingElse", "Data": {"id": "x"}}])
         await ws._handle_text(raw)
+        on_delta.assert_not_awaited()
+        assert "somethingElse" in ws._unknown_message_types_logged
+        # Second frame of the same type is not re-logged (set membership only)
+        await ws._handle_text(raw)
+        assert list(ws._unknown_message_types_logged) == ["somethingElse"]
+
+    async def test_communication_lost_dispatches_handler(self) -> None:
+        on_comm = AsyncMock()
+        ws, on_delta = _make_ws(on_communication=on_comm)
+        await ws._handle_text(_comm_frame("unitCommunicationLost", "unit-comm-1"))
+        on_delta.assert_not_awaited()
+        on_comm.assert_awaited_once()
+        assert on_comm.await_args is not None
+        unit_id, connected, ts = on_comm.await_args.args
+        assert unit_id == "unit-comm-1"
+        assert connected is False
+        assert ts is not None
+        assert ts.isoformat().startswith("2026-10-05T16:32:23")
+
+    async def test_communication_restored_dispatches_handler(self) -> None:
+        on_comm = AsyncMock()
+        ws, on_delta = _make_ws(on_communication=on_comm)
+        await ws._handle_text(_comm_frame("unitCommunicationRestored", "unit-comm-2"))
+        on_delta.assert_not_awaited()
+        assert on_comm.await_args is not None
+        unit_id, connected, _ts = on_comm.await_args.args
+        assert unit_id == "unit-comm-2"
+        assert connected is True
+
+    async def test_communication_without_handler_is_tolerated(self) -> None:
+        ws, on_delta = _make_ws()
+        await ws._handle_text(_comm_frame("unitCommunicationLost", "unit-comm-3"))
         on_delta.assert_not_awaited()
 
     async def test_missing_unit_id_is_skipped(self) -> None:
