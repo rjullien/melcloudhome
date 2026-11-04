@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.2.1] - 2026-11-04
+
+### Changed
+
+- Merge upstream v2.6.2 while retaining the fork's per-unit connection state, communication events, standby and cloud schedule sensors, vane and error-code diagnostics, and redacted DEBUG captures.
+- Use four-part fork versions: `X.Y.Z.N`, where `X.Y.Z` is the upstream release and `N` is the fork revision, starting at 1 for each upstream release.
+
+## [2.6.2] - 2026-11-01
+
+### Fixed
+
+- Home Assistant no longer logs four deprecation warnings about the device registry from this integration when it starts. The code behind them stops working in Home Assistant 2027.9, and the integration would then fail to start up. (thanks @budziam, #368, #372)
+
 ## [2.6.1-rjullien.4] - 2026-10-22
 
 ### Added

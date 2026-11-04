@@ -228,9 +228,9 @@ deploy-watch:  ## Deploy to production HA and watch logs
 	uv run python tools/deploy_custom_component.py melcloudhome --watch
 
 # Version management commands
-version-patch:  ## Bump patch version (x.y.Z)
+version-patch:  ## Bump fork revision (x.y.z.N), or upstream patch (x.y.Z)
 	@CURRENT=$$(jq -r '.version' custom_components/melcloudhome/manifest.json); \
-		NEW=$$(echo $$CURRENT | awk -F. '{$$3+=1; print $$1"."$$2"."$$3}'); \
+		NEW=$$(echo $$CURRENT | awk -F. '{if (NF == 4) {$$4+=1; print $$1"."$$2"."$$3"."$$4} else {$$3+=1; print $$1"."$$2"."$$3}}'); \
 		echo "Bumping version $$CURRENT -> $$NEW"; \
 		jq --arg version "$$NEW" '.version = $$version' custom_components/melcloudhome/manifest.json > manifest.tmp && \
 		mv manifest.tmp custom_components/melcloudhome/manifest.json; \
@@ -242,6 +242,7 @@ version-patch:  ## Bump patch version (x.y.Z)
 
 version-minor:  ## Bump minor version (x.Y.0)
 	@CURRENT=$$(jq -r '.version' custom_components/melcloudhome/manifest.json); \
+		case "$$CURRENT" in *.*.*.*) echo "Fork base versions change only when you merge the upstream release"; exit 1;; esac; \
 		NEW=$$(echo $$CURRENT | awk -F. '{$$2+=1; $$3=0; print $$1"."$$2"."$$3}'); \
 		echo "Bumping version $$CURRENT -> $$NEW"; \
 		jq --arg version "$$NEW" '.version = $$version' custom_components/melcloudhome/manifest.json > manifest.tmp && \
@@ -254,6 +255,7 @@ version-minor:  ## Bump minor version (x.Y.0)
 
 version-major:  ## Bump major version (X.0.0)
 	@CURRENT=$$(jq -r '.version' custom_components/melcloudhome/manifest.json); \
+		case "$$CURRENT" in *.*.*.*) echo "Fork base versions change only when you merge the upstream release"; exit 1;; esac; \
 		NEW=$$(echo $$CURRENT | awk -F. '{$$1+=1; $$2=0; $$3=0; print $$1"."$$2"."$$3}'); \
 		echo "Bumping version $$CURRENT -> $$NEW"; \
 		jq --arg version "$$NEW" '.version = $$version' custom_components/melcloudhome/manifest.json > manifest.tmp && \

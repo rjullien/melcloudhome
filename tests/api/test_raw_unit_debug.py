@@ -45,20 +45,21 @@ def test_redact_email_mac_token_and_sensitive_keys() -> None:
 def test_context_dump_logs_once_then_on_change(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    settings = [
+        {"name": "OperationMode", "value": "Automatic"},
+        {"name": "InStandbyMode", "value": "False"},
+    ]
     unit = {
         "id": "unit-1",
         "givenDisplayName": "Salon",
-        "settings": [
-            {"name": "OperationMode", "value": "Automatic"},
-            {"name": "InStandbyMode", "value": "False"},
-        ],
+        "settings": settings,
         "isConnected": True,
         "systemId": "LLLLLLLL-LLLL-LLLL-LLLL-LLLLLLLLLLLL",
     }
     with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         log_ata_context_unit(unit)
         log_ata_context_unit(unit)  # unchanged — silent
-        unit["settings"][1]["value"] = "True"
+        settings[1]["value"] = "True"
         log_ata_context_unit(unit)
 
     messages = [
