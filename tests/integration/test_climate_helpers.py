@@ -1,88 +1,74 @@
-"""Home Assistant-dependent tests for ATA climate action determination."""
+"""Test ATA HVAC actions through Home Assistant climate state."""
 
-from __future__ import annotations
+from typing import Any
 
 import pytest
 from homeassistant.components.climate import HVACAction
+from homeassistant.core import HomeAssistant
 
-from custom_components.melcloudhome.climate_helpers import HVACActionDeterminer
-from tests.integration.conftest import create_mock_ata_unit
+from .conftest import (
+    create_mock_ata_building,
+    create_mock_ata_unit,
+    create_mock_ata_user_context,
+    setup_ata_integration_custom,
+)
 
 
-@pytest.fixture
-def determiner() -> HVACActionDeterminer:
-    return HVACActionDeterminer()
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [
+        ({"power": False}, HVACAction.OFF),
+        (
+            {"operation_mode": "Heat", "room_temperature": 19.0},
+            HVACAction.HEATING,
+        ),
+        (
+            {
+                "operation_mode": "Cool",
+                "set_temperature": 20.0,
+                "room_temperature": 22.0,
+            },
+            HVACAction.COOLING,
+        ),
+        (
+            {
+                "operation_mode": "Automatic",
+                "room_temperature": 23.0,
+                "in_standby_mode": True,
+            },
+            HVACAction.PREHEATING,
+        ),
+        (
+            {"operation_mode": "Automatic", "room_temperature": 19.0},
+            HVACAction.IDLE,
+        ),
+        (
+            {"operation_mode": "Automatic", "room_temperature": 23.0},
+            HVACAction.IDLE,
+        ),
+        (
+            {"operation_mode": "Heat", "in_standby_mode": True},
+            HVACAction.PREHEATING,
+        ),
+        (
+            {
+                "operation_mode": "Cool",
+                "set_temperature": 20.0,
+                "room_temperature": 22.0,
+                "in_standby_mode": True,
+            },
+            HVACAction.IDLE,
+        ),
+    ],
+)
+async def test_climate_hvac_action(
+    hass: HomeAssistant, settings: dict[str, Any], expected: HVACAction
+) -> None:
+    unit = create_mock_ata_unit(**settings)
+    context = create_mock_ata_user_context([create_mock_ata_building(units=[unit])])
+    await setup_ata_integration_custom(hass, context)
 
-
-class TestHVACActionDeterminer:
-    def test_off_when_powered_off(self, determiner: HVACActionDeterminer) -> None:
-        unit = create_mock_ata_unit(power=False, operation_mode="Heat")
-        assert determiner.determine_action(unit) == HVACAction.OFF
-
-    def test_heat_below_target_is_heating(
-        self, determiner: HVACActionDeterminer
-    ) -> None:
-        unit = create_mock_ata_unit(
-            operation_mode="Heat", set_temperature=21.0, room_temperature=19.0
-        )
-        assert determiner.determine_action(unit) == HVACAction.HEATING
-
-    def test_cool_above_target_is_cooling(
-        self, determiner: HVACActionDeterminer
-    ) -> None:
-        unit = create_mock_ata_unit(
-            operation_mode="Cool", set_temperature=20.0, room_temperature=22.0
-        )
-        assert determiner.determine_action(unit) == HVACAction.COOLING
-
-    def test_auto_standby_is_preheating_not_cooling(
-        self, determiner: HVACActionDeterminer
-    ) -> None:
-        """René bug: Auto + attente chauffage must not report cooling."""
-        unit = create_mock_ata_unit(
-            operation_mode="Automatic",
-            set_temperature=21.0,
-            room_temperature=23.0,  # would have been COOLING under the old heuristic
-            in_standby_mode=True,
-        )
-        assert determiner.determine_action(unit) == HVACAction.PREHEATING
-
-    def test_auto_without_standby_is_idle_even_when_temps_suggest_heating(
-        self, determiner: HVACActionDeterminer
-    ) -> None:
-        unit = create_mock_ata_unit(
-            operation_mode="Automatic",
-            set_temperature=21.0,
-            room_temperature=19.0,
-            in_standby_mode=False,
-        )
-        assert determiner.determine_action(unit) == HVACAction.IDLE
-
-    def test_auto_without_standby_is_idle_even_when_temps_suggest_cooling(
-        self, determiner: HVACActionDeterminer
-    ) -> None:
-        unit = create_mock_ata_unit(
-            operation_mode="Automatic",
-            set_temperature=21.0,
-            room_temperature=23.0,
-            in_standby_mode=False,
-        )
-        assert determiner.determine_action(unit) == HVACAction.IDLE
-
-    def test_heat_standby_is_preheating(self, determiner: HVACActionDeterminer) -> None:
-        unit = create_mock_ata_unit(
-            operation_mode="Heat",
-            set_temperature=21.0,
-            room_temperature=19.0,
-            in_standby_mode=True,
-        )
-        assert determiner.determine_action(unit) == HVACAction.PREHEATING
-
-    def test_cool_standby_is_idle(self, determiner: HVACActionDeterminer) -> None:
-        unit = create_mock_ata_unit(
-            operation_mode="Cool",
-            set_temperature=20.0,
-            room_temperature=22.0,
-            in_standby_mode=True,
-        )
-        assert determiner.determine_action(unit) == HVACAction.IDLE
+    state = hass.states.get("climate.melcloudhome_a1b2_9abc_climate")
+    assert state is not None
+    assert state.attributes["hvac_action"] == expected

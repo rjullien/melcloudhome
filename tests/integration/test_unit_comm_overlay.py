@@ -1,77 +1,91 @@
-"""Home Assistant-dependent WebSocket/REST connection overlay tests."""
+"""Test WebSocket/REST connection reconciliation through Home Assistant."""
 
-from __future__ import annotations
-
-from datetime import UTC, datetime
+import json
 from unittest.mock import MagicMock
 
+import aiohttp
 import pytest
+from homeassistant.const import STATE_OFF, STATE_ON
+from homeassistant.core import HomeAssistant
 
-from custom_components.melcloudhome.coordinator import (
-    MELCloudHomeCoordinator,
-    _UnitCommOverlay,
-)
-from tests.integration.conftest import (
+from custom_components.melcloudhome.const import DOMAIN
+
+from .conftest import (
+    TEST_ATA_UNIT_ID,
     create_mock_ata_building,
     create_mock_ata_unit,
     create_mock_ata_user_context,
+    setup_ata_integration_custom,
+    wire_connected_ws,
 )
 
-
-def _coordinator() -> MELCloudHomeCoordinator:
-    """Minimal coordinator instance without running HA update loops."""
-    hass = MagicMock()
-    client = MagicMock()
-    # Bypass DataUpdateCoordinator.__init__ side effects where possible
-    coord = object.__new__(MELCloudHomeCoordinator)
-    coord.hass = hass
-    coord.client = client
-    coord._units = {}
-    coord._atw_units = {}
-    coord._unit_comm = {}
-    coord.async_update_listeners = MagicMock()
-    return coord
+CONNECTION_ENTITY = "binary_sensor.melcloudhome_a1b2_9abc_connection_state"
+EVENT_TIME = "2026-10-05T16:32:23+00:00"
 
 
-def test_effective_connection_prefers_ws_overlay_until_reconcile() -> None:
-    coord = _coordinator()
-    coord._unit_comm["u1"] = _UnitCommOverlay(ws_is_connected=False, disagree_polls=0)
-    assert coord.effective_connection_is_on("u1", True) is False
-    assert coord.effective_connection_is_on("u1", True) is False  # still overlay
-
-
-def test_effective_connection_uses_rest_after_disagree_streak() -> None:
-    coord = _coordinator()
-    coord._unit_comm["u1"] = _UnitCommOverlay(ws_is_connected=False, disagree_polls=2)
-    assert coord.effective_connection_is_on("u1", True) is True
-
-
-def test_reconcile_logs_once_and_clears_overlay() -> None:
-    coord = _coordinator()
-    unit = create_mock_ata_unit(unit_id="u1", is_connected=True, name="Salon")
-    context = create_mock_ata_user_context([create_mock_ata_building(units=[unit])])
-    coord._unit_comm["u1"] = _UnitCommOverlay(ws_is_connected=False, disagree_polls=1)
-    coord._reconcile_unit_communication(context)
-    overlay = coord._unit_comm["u1"]
-    assert overlay.disagree_polls == 2
-    assert overlay.disagreement_logged is True
-    assert overlay.ws_is_connected is None
-    # Second reconcile with cleared overlay is a no-op
-    coord._reconcile_unit_communication(context)
-    assert overlay.disagree_polls == 2
+def _communication_frame(connected: bool) -> MagicMock:
+    frame = MagicMock()
+    frame.type = aiohttp.WSMsgType.TEXT
+    frame.data = json.dumps(
+        {
+            "messageType": (
+                "unitCommunicationRestored" if connected else "unitCommunicationLost"
+            ),
+            "Data": {"id": TEST_ATA_UNIT_ID, "timestamp": EVENT_TIME},
+        }
+    )
+    return frame
 
 
 @pytest.mark.asyncio
-async def test_on_ws_communication_sets_timestamps() -> None:
-    coord = _coordinator()
-    unit = create_mock_ata_unit(unit_id="u1", name="Salon")
-    coord._units["u1"] = unit
-    ts = datetime(2026, 10, 5, 16, 32, 23, tzinfo=UTC)
-    await coord._on_ws_communication("u1", False, ts)
-    overlay = coord._unit_comm["u1"]
-    assert overlay.ws_is_connected is False
-    assert overlay.last_communication_lost == ts
-    coord.async_update_listeners.assert_called()
-    attrs = coord.connection_state_attributes(unit)
-    assert attrs["last_communication_lost"] == ts.isoformat()
-    assert attrs["is_multi_split_system"] is False
+@pytest.mark.parametrize("connected", [False, True])
+async def test_ws_communication_updates_connection_state_and_timestamp(
+    hass: HomeAssistant, connected: bool
+) -> None:
+    unit = create_mock_ata_unit(is_connected=not connected)
+    context = create_mock_ata_user_context([create_mock_ata_building(units=[unit])])
+    await setup_ata_integration_custom(
+        hass,
+        context,
+        configure_client=lambda client: wire_connected_ws(
+            client, [_communication_frame(connected)]
+        ),
+    )
+
+    state = hass.states.get(CONNECTION_ENTITY)
+    assert state is not None
+    assert state.state == (STATE_ON if connected else STATE_OFF)
+    timestamp_key = (
+        "last_communication_restored" if connected else "last_communication_lost"
+    )
+    assert state.attributes[timestamp_key] == EVENT_TIME
+    assert state.attributes["is_connected"] is not connected
+    assert state.attributes["is_multi_split_system"] is False
+
+
+@pytest.mark.asyncio
+async def test_rest_wins_after_two_disagreeing_refreshes_and_logs_once(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    unit = create_mock_ata_unit(is_connected=True)
+    context = create_mock_ata_user_context([create_mock_ata_building(units=[unit])])
+    await setup_ata_integration_custom(
+        hass,
+        context,
+        configure_client=lambda client: wire_connected_ws(
+            client, [_communication_frame(False)]
+        ),
+    )
+    state = hass.states.get(CONNECTION_ENTITY)
+    assert state is not None
+    assert state.state == STATE_OFF
+
+    for expected in (STATE_OFF, STATE_ON, STATE_ON):
+        await hass.services.async_call(DOMAIN, "force_refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        state = hass.states.get(CONNECTION_ENTITY)
+        assert state is not None
+        assert state.state == expected
+        assert state.attributes["last_communication_lost"] == EVENT_TIME
+
+    assert caplog.text.count("for more than one poll; using REST") == 1
