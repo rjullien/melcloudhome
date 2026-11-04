@@ -72,7 +72,7 @@ jobs:
       - name: Validate README "What's New" version
         run: |
           BASE_VERSION="${STEPS_BASE_VERSION_OUTPUTS_BASE}"
-          README_VERSION=$(grep "## What's New in v" README.md | sed -n 's/## What'\''s New in v\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
+          README_VERSION=$(grep "## What's New in v" README.md | sed -n 's/## What'\''s New in v\([0-9]*\.[0-9]*\.[0-9]*\(\.[0-9]*\)\?\).*/\1/p')
           echo "README 'What's New' version: $README_VERSION"
           echo "Expected version: $BASE_VERSION"
           if [ -z "$README_VERSION" ]; then
