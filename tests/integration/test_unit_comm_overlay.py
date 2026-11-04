@@ -1,4 +1,4 @@
-"""Coordinator WebSocket/REST connection overlay reconciliation."""
+"""Home Assistant-dependent WebSocket/REST connection overlay tests."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Unit tests for HVACActionDeterminer (ATA climate hvac_action)."""
+"""Home Assistant-dependent tests for ATA climate action determination."""
 
 from __future__ import annotations
 
