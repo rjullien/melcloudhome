@@ -6,6 +6,10 @@ This document describes the release process for MELCloud Home integration, inclu
 
 ---
 
+## Fork Versions
+
+This fork uses `X.Y.Z.N`: `X.Y.Z` is the upstream release and `N` is the fork revision. `make version-patch` advances only the fourth component (`2.6.2.1` → `2.6.2.2`). To change the upstream base, merge the corresponding upstream release and start its fork revision at `.1`. `make version-minor` and `make version-major` reject four-part versions to prevent changing the base without an upstream merge. Three-part upstream versions keep their original bump behavior.
+
 ## Standard Release Workflow
 
 Releases follow GitHub Flow with branch protection. All changes must go through pull requests.
