@@ -10,11 +10,11 @@
 
 Home Assistant custom integration for **MELCloud Home**.
 
-## What's New in v2.6.2.1
+## What's New in v2.6.3.1
 
-This fork merges upstream v2.6.2 and retains its per-unit connection, standby, cloud schedule, vane and error-code diagnostics. Fork versions follow `X.Y.Z.N`: the upstream release plus a fork revision starting at 1.
+This fork merges upstream v2.6.3 and retains its per-unit connection, standby, cloud schedule, vane and error-code diagnostics. Fork versions follow `X.Y.Z.N`: the upstream release plus a fork revision starting at 1.
 
-**Ready for future Home Assistant releases.** Since Home Assistant 2026.10, the integration logged four deprecation warnings about the device registry each time it started. The code behind them would stop working in Home Assistant 2027.9, and the integration would then fail to start. The warnings are gone and device names you've set are kept as before. Fix contributed by budziam. Reported in [#368](https://github.com/andrew-blake/melcloudhome/issues/368) and [#372](https://github.com/andrew-blake/melcloudhome/issues/372).
+**Heat pump flow and return temperatures keep updating.** On some heat pumps, the flow and return temperature sensors could stop updating for hours while the heat pump was running. The timing of a heat pump's readings can drift through the day. While the readings landed exactly on the minute, the integration mistook them for filler points that MELCloud adds to its charts and ignored them. Outdoor temperature on heat pumps and air conditioners uses the same check and gets the same fix. Reported and tested by Pipazoid in [#394](https://github.com/andrew-blake/melcloudhome/issues/394).
 
 See [CHANGELOG.md](CHANGELOG.md) for full history.
 
