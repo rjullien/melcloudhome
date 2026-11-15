@@ -28,6 +28,9 @@ For each air conditioning unit, the following entities are created:
 
 ### Climate Entity
 
+See [État d'un climatiseur ATA](ata-climate-state.md) (French) for how the
+commanded mode, inferred activity and fork connectivity signals differ.
+
 - **Entity ID**: `climate.melcloudhome_{short_id}_climate`
 - **Features**: Power on/off, temperature control, HVAC modes, fan speeds, swing modes
 - **HVAC Action**: Heat/Cool from mode + temperature hysteresis; Automatic does not guess heat vs cool from temperatures; `InStandbyMode` with Heat/Automatic → `preheating`. Attribute `in_standby_mode` mirrors the standby binary sensor.
